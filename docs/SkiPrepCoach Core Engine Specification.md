@@ -1,4 +1,4 @@
-# SkiPrepCoach — Core Engine Specification v0.1
+# SkiPrepCoach — Core Engine Specification v0.2
 
 ## 1. Purpose
 
@@ -20,7 +20,7 @@ The engine optimizes for safe, steady progress toward skiing capability by using
 - estimated warm-up state
 - variation rules
 
-There are no fixed workouts, snack mode, or user-selected plans. Everything is expressed as a repeated loop:
+There are no fixed workouts, snack mode, or user-selected plans, and **no concept of time-to-goal** — no deadlines, countdowns, or seasons. The engine only ever reasons about the athlete's current state (see Section 9). Everything is expressed as a repeated loop:
 
 ```
 GET /next
@@ -41,7 +41,7 @@ Stores stable user-level information.
   "userId": "user-001",
   "displayName": "Will",
   "primaryGoal": "ski_resilience",
-  "targetDate": "2026-11-01",
+  "timezone": "America/Los_Angeles",
   "availableEquipment": [
     "gym",
     "dumbbells",
@@ -65,6 +65,10 @@ Stores stable user-level information.
 ```
 
 Used by `next` logic to filter exercises, prioritize goals, and bias recommendations toward enjoyable options.
+
+`timezone` defines the athlete's local day boundary — daily stimulus (Step 4) and recovery-class `maxPerDay` counters (2.8) reset at local midnight in this timezone.
+
+There is deliberately no `targetDate` or deadline field — the engine has no concept of time remaining toward a goal.
 
 ### 2.2 Capability Definitions
 
@@ -130,9 +134,32 @@ Capabilities are things the engine tries to improve.
 
 Used to score candidate actions. Higher-priority capabilities receive more weight, especially if currently undertrained or limiting.
 
-### 2.3 User Capability State
+### 2.3 Capability Targets
 
-Stores the current estimate of user ability.
+Each capability's target score is **derived from its priority** rather than hand-authored as a separate number, so the two can't drift out of sync:
+
+```
+target = min(100, 25 + 5 × priority)
+```
+
+| capability | priority | target |
+|---|---|---|
+| knee_capacity | 10 | 75 |
+| lower_body_strength | 9 | 70 |
+| balance | 9 | 70 |
+| posterior_chain | 8 | 65 |
+| stamina | 8 | 65 |
+| mobility | 7 | 60 |
+| aerobic_endurance | 7 | 60 |
+| reaction | 6 | 55 |
+| fall_resilience | 6 | 55 |
+| upper_body_strength | 5 | 50 |
+
+Capability scores (2.4) are on a 0–100 scale, measured against these targets. Targets drive Step 5 (limiting capabilities) and Step 4 (daily stimulus).
+
+### 2.4 User Capability State
+
+Stores the current estimate of user ability, on a 0–100 scale (see 2.3 for targets).
 
 ```json
 {
@@ -162,14 +189,26 @@ Stores the current estimate of user ability.
 
 Fields:
 
-- `score`: rough capability level, not visible as a medical metric.
+- `score`: 0–100, measured against the target in 2.3.
 - `trend`: improving, stable, declining, unknown.
 - `lastTrainedAt`: used for recovery and variation.
-- `fatigue`: estimated current fatigue cost for that capability.
+- `fatigue`: current decayed fatigue for that capability (see 2.8 for the decay formula).
 
-### 2.4 Exercise Definition
+### 2.5 Movement Patterns
 
-Base exercise information. This should be compatible with Free Exercise DB style fields, then extended.
+Every exercise has exactly one primary `movementPattern`, used for variation logic (Step 8) and to scope recovery tracking (2.8). SkiPrepCoach uses the standard 7-pattern kinesiology taxonomy:
+
+- `squat`
+- `hinge`
+- `lunge`
+- `push`
+- `pull`
+- `rotation`
+- `gait_locomotion` (walking, running, carrying, skating)
+
+### 2.6 Exercise Definition
+
+Base exercise information. This should be compatible with Free Exercise DB style fields, then extended. `movementPattern` must be one of the 7 ids in 2.5.
 
 ```json
 {
@@ -224,9 +263,11 @@ Base exercise information. This should be compatible with Free Exercise DB style
 }
 ```
 
+`capabilityEffects` is also the basis for stimulus and capability growth (5.4), and `fatigueCost` is also the basis for the fatigue penalty in scoring (Step 7).
+
 Used by `next` logic for filtering, scoring, safety, recovery, variation, and explanation.
 
-### 2.5 Exercise Prescription
+### 2.7 Exercise Prescription
 
 A concrete recommended dose.
 
@@ -265,9 +306,9 @@ Rep-based example:
 
 Used as the returned `nextAction`.
 
-### 2.6 Recovery Classes
+### 2.8 Recovery Classes
 
-Defines minimum recovery rules.
+Defines minimum recovery rules and fatigue decay rates.
 
 ```json
 {
@@ -275,47 +316,62 @@ Defines minimum recovery rules.
     "daily": {
       "minRestHours": 6,
       "maxPerDay": 6,
-      "maxPerWeek": 42
+      "maxPerWeek": 42,
+      "halfLifeHours": 9
     },
     "light": {
       "minRestHours": 12,
       "maxPerDay": 3,
-      "maxPerWeek": 14
+      "maxPerWeek": 14,
+      "halfLifeHours": 18
     },
     "moderate": {
       "minRestHours": 24,
       "maxPerDay": 2,
-      "maxPerWeek": 6
+      "maxPerWeek": 6,
+      "halfLifeHours": 36
     },
     "heavy_strength": {
       "minRestHours": 48,
       "maxPerDay": 1,
-      "maxPerWeek": 3
+      "maxPerWeek": 3,
+      "halfLifeHours": 72
     },
     "max_strength": {
       "minRestHours": 72,
       "maxPerDay": 1,
-      "maxPerWeek": 2
+      "maxPerWeek": 2,
+      "halfLifeHours": 108
     },
     "plyometric": {
       "minRestHours": 48,
       "maxPerDay": 1,
-      "maxPerWeek": 3
+      "maxPerWeek": 3,
+      "halfLifeHours": 72
     },
     "hiit": {
       "minRestHours": 48,
       "maxPerDay": 1,
-      "maxPerWeek": 2
+      "maxPerWeek": 2,
+      "halfLifeHours": 72
     }
   }
 }
 ```
 
-Used to block actions that are not recovered.
+**Scope:** recovery is tracked per **(movementPattern, recoveryClass)** pair — not per specific exercise, and not globally per recovery class. Doing a `heavy_strength` hinge exercise (e.g. barbell RDL) blocks other `heavy_strength` hinge exercises for `minRestHours` and counts toward `hinge:heavy_strength`'s `maxPerDay`/`maxPerWeek`. It does **not** block `heavy_strength` squat work, and does not block `light`-class hinge work — those are different buckets. This lets fatigued tissue groups rest independently of unrelated movement patterns, while still preventing someone from dodging intended rest by swapping to a different exercise of the same class and pattern.
 
-### 2.7 User Activity History
+**Fatigue decay:** each bucket's fatigue decays exponentially using its recovery class's `halfLifeHours`, independent of the hard eligibility gate:
 
-Every completed or attempted action is stored as an event.
+```
+fatigue_now = fatigue_added × 0.5 ^ (hoursElapsed / halfLifeHours)
+```
+
+This decayed value feeds the fatigue penalty in Step 7 scoring — it's a soft signal, not an eligibility check (the `minRestHours`/`maxPerDay`/`maxPerWeek` gate above already handles hard blocking).
+
+### 2.9 User Activity History
+
+Every completed or attempted action is stored as an event — including acknowledged `rest` recommendations (see 3.1), which log the same way as exercise results.
 
 ```json
 {
@@ -348,9 +404,9 @@ Every completed or attempted action is stored as an event.
 
 Used to update capability, fatigue, warmth, exercise variation, readiness, and progression.
 
-### 2.8 Readiness State
+### 2.10 Readiness State
 
-Computed from recent reports and optional biometric/manual data.
+Computed from recent manual reports. For MVP this is **manual entry only** — no biometric/wearable integration. Garmin-shaped fields (resting HR, HRV, body battery, training readiness) are out of scope; `computedStatus` is derived only from the fields below. A biometric integration can be layered in later without changing the pipeline shape.
 
 ```json
 {
@@ -360,10 +416,6 @@ Computed from recent reports and optional biometric/manual data.
   "swelling": false,
   "stairs": "easy",
   "sleepQuality": "good",
-  "restingHr": 52,
-  "hrvStatus": "balanced",
-  "bodyBattery": 78,
-  "trainingReadiness": 82,
   "computedStatus": "green"
 }
 ```
@@ -371,12 +423,12 @@ Computed from recent reports and optional biometric/manual data.
 Rules:
 
 - Red if swelling, limp, or pain ≥4.
-- Yellow if pain 2–3, poor sleep, elevated fatigue, or bad recovery markers.
+- Yellow if pain 2–3, poor sleep, or elevated fatigue.
 - Green if low pain, no swelling, normal movement, and acceptable fatigue.
 
 Used early in the `next` pipeline.
 
-### 2.9 Warmth State
+### 2.11 Warmth State
 
 Warmth is computed, not manually selected.
 
@@ -428,12 +480,17 @@ Used to block cold-unsafe exercises and sequence actions naturally.
 GET /api/users/{userId}/next
 ```
 
+A `recommendationId` is generated whenever a new `nextAction` (exercise **or** rest) is produced. Calling `GET /next` again before that recommendation is resolved returns the identical pinned recommendation (same `recommendationId`) rather than recomputing — this prevents the action changing out from under the user mid-session. A pending recommendation that's never resolved expires and is recomputed fresh after 4 hours.
+
+Rest is not a special case in this lifecycle: it gets a `recommendationId` like any other action and is resolved via `POST /result` (a lightweight acknowledgment), which logs a `rest` event in history exactly like an exercise result does.
+
 Returns:
 
 ```json
 {
   "nextAction": {
     "type": "exercise",
+    "recommendationId": "rec-20260704-001",
     "exerciseId": "wall_sit",
     "title": "Wall Sit",
     "icon": "🧍",
@@ -483,6 +540,7 @@ If rest is best:
 {
   "nextAction": {
     "type": "rest",
+    "recommendationId": "rec-20260704-002",
     "title": "Rest Is the Best Next Action",
     "estimatedDurationSec": null,
     "instructions": [
@@ -505,6 +563,8 @@ If rest is best:
   }
 }
 ```
+
+The rest recommendation is acknowledged via the same `POST /result` endpoint (3.2), typically with a minimal `actual` payload, which resolves the pinned recommendation and logs the event.
 
 ### 3.2 Submit Result
 
@@ -555,16 +615,15 @@ Load:
 - recovery classes
 - recent events
 - readiness state
-- current date/time
-- goal and target date
+- current date/time (in the user's timezone, 2.1)
 
 ### Step 2 — Update Derived State
 
 Before choosing an action, recompute:
 
 - current warmth
-- decayed fatigue
-- recovered capabilities
+- decayed fatigue (2.8)
+- recovered (movementPattern, recoveryClass) buckets
 - today's stimulus
 - readiness status
 - recently repeated movement patterns
@@ -597,9 +656,13 @@ Possible output:
 
 ### Step 4 — Determine Whether Enough Has Been Done Today
 
-Compute `todayStimulusScore`.
+Compute `todayStimulusScore` as a priority-weighted sum of today's per-capability stimulus earned (stimulus per event is defined in 5.4):
 
-Example:
+```
+stimulusScore = Σ_c stimulusEarnedToday[c] × (priority[c] / 10)
+```
+
+`targetStimulusScore` is a fixed constant: **70**, the same every day for every user.
 
 ```json
 {
@@ -614,22 +677,17 @@ Example:
 }
 ```
 
-If enough useful stimulus has been achieved and no low-fatigue beneficial action remains, return rest.
-
-This prevents overtraining.
+If `stimulusScore ≥ targetStimulusScore` and no remaining candidate offers meaningful benefit without excessive fatigue cost, return rest. This prevents overtraining.
 
 ### Step 5 — Identify Limiting Capabilities
 
-Score each capability.
+Rank capabilities by:
 
-Factors:
+```
+limitingRank = (target[c] − score[c]) × (priority[c] / 10)
+```
 
-- low score relative to goal
-- high goal priority
-- undertrained recently
-- gate requirement nearby
-- trend declining
-- relevant to current season
+adjusted upward if undertrained recently (no stimulus earned in the last 3 days) or `trend` is declining. The top-ranked capabilities (typically top 2–3) are flagged as **limiting** and receive the 1.5× scoring boost in Step 7.
 
 Example:
 
@@ -658,15 +716,15 @@ Generate candidates from the exercise library.
 
 An exercise is initially eligible if:
 
-- user has equipment
+- user has equipment (for MVP, all equipment in `availableEquipment` — 2.1 — is assumed accessible at all times; there is no per-call context for current location. This can be added later as an optional `GET /next` parameter if it turns out to matter in practice)
 - not medically constrained
 - current level allows it
 - readiness allows it
 - warmth allows it
-- recovery class allows it
+- its `(movementPattern, recoveryClass)` bucket is eligible (2.8)
 - target capability is useful
 - fatigue cost is acceptable
-- pain history is acceptable
+- not currently flagged `elevatedRisk` without an eligible regression available (5.5)
 
 Example blocked exercise:
 
@@ -680,24 +738,15 @@ Example blocked exercise:
 
 ### Step 7 — Score Candidate Actions
 
-Each candidate gets a score.
-
-Suggested scoring factors:
+Each candidate gets a score:
 
 ```
-score =
-  capability benefit
-+ goal priority
-+ limiting capability bonus
-+ recovery compatibility
-+ warm-up compatibility
-+ variation bonus
-+ enjoyment bonus
-+ gate preparation bonus
-- fatigue cost
-- pain risk
-- recent repetition penalty
-- complexity penalty
+score(exercise) =
+    Σ_c [ capabilityEffects[c] × (priority[c] / 10) × (1.5 if c is limiting else 1.0) ]
+  + enjoymentBonus            (+10 flat if the exercise is tagged to a liked activity, else 0)
+  − Σ_c [ fatigueCost[c] × (currentFatigue[c] / 100) ]
+  − repetitionPenalty         (recency-based, decays over ~3 days; see Step 8)
+  − riskPenalty               (riskLevel baseline: low=0, moderate=5, high=15; +30 if elevatedRisk flagged — 5.5)
 ```
 
 Example:
@@ -708,8 +757,8 @@ Example:
   "score": 82,
   "reasonCodes": [
     "trains_limiting_capability",
-    "safe_when_slightly_warm",
-    "low_fatigue_cost"
+    "low_current_fatigue",
+    "no_repetition_penalty"
   ]
 }
 ```
@@ -726,10 +775,10 @@ Capability → Movement Pattern → Exercise Family → Variant
 
 Rules:
 
-- Do not repeat the same exercise too often if safe substitutes exist.
+- Do not repeat the same exercise too often if safe substitutes exist (already penalized via `repetitionPenalty` in Step 7).
 - Do not vary so much that progression becomes unmeasurable.
 - Prefer variants in the same movement family when the same training effect is desired.
-- Use regressions if readiness or warmth is low.
+- Use regressions if readiness or warmth is low, or if the exercise is flagged `elevatedRisk` (5.5).
 - Use progressions only when recent results justify it.
 
 Example:
@@ -745,17 +794,13 @@ Example:
 
 ### Step 9 — Select Dose
 
-After selecting the exercise, choose dose.
+After selecting the exercise, choose dose. Dose is chosen **purely from that specific exercise's own history** — there is no separate "level" field anywhere in the model. Dose depends on:
 
-Dose depends on:
-
-- recent performance
-- target RPE
-- pain response
-- recovery state
-- warmth
-- level
-- goal for the action
+- this exercise's most recent prescription and actual performance
+- target RPE vs. actual RPE
+- pain response vs. `painLimit`
+- current fatigue/recovery state for the capabilities it trains
+- current warmth
 
 Example:
 
@@ -808,41 +853,52 @@ Then apply decay based on time.
 
 ### 5.3 Update Fatigue
 
-Add fatigue according to exercise fatigue model and actual dose.
-
-Example:
-
-```json
-{
-  "posterior_chain": "+12",
-  "knee_capacity": "+4",
-  "lower_body_strength": "+7"
-}
-```
+Add fatigue to the exercise's `(movementPattern, recoveryClass)` bucket(s) according to its `fatigueCost` and actual dose (see 2.8 for the decay formula).
 
 ### 5.4 Update Capability Scores
 
-If completed successfully with acceptable pain and RPE, increment capability.
+For each capability the completed exercise trains, compute a dose ratio (actual / prescribed, capped at 1.0 so exceeding the prescription doesn't over-reward) and the stimulus earned:
+
+```
+stimulusEarned[c] = capabilityEffects[c] × doseRatio
+```
+
+This value adds to today's per-capability stimulus (used in Step 4) regardless of outcome. It **also** grows the permanent capability score, with diminishing returns as the score approaches its target — but only if the completion was clean (see conditions below):
+
+```
+scoreIncrement[c] = stimulusEarned[c] × 0.1 × (1 − score[c] / target[c])
+```
 
 Example:
 
 ```json
 {
-  "knee_capacity": "+0.2",
-  "balance": "+0.1"
+  "exerciseId": "wall_sit",
+  "capabilityEffects_knee_capacity": 6,
+  "doseRatio": 1.0,
+  "stimulusEarned": 6,
+  "currentScore": 22,
+  "target": 75,
+  "scoreIncrement": 0.47,
+  "newScore": 22.47
 }
 ```
 
-Do not increase capability if:
+Do not apply the score increment (stimulus still counts toward today's total) if:
 
-- pain exceeded limit
+- pain exceeded `painLimit`
 - form was poor
 - user stopped early due to discomfort
 - RPE was far above target
 
 ### 5.5 Update Pain Risk
 
-If exercise caused pain or next-day soreness, reduce future score or require regression.
+If `maxPain > painLimit`, or the user stopped early due to discomfort, flag the exercise `elevatedRisk = true`. While flagged:
+
+- the exercise receives a flat **−30** `riskPenalty` in Step 7 scoring, on top of its baseline `riskLevel` penalty
+- Step 8's variation logic is forced to prefer its regression over the exercise itself or any of its progressions
+
+The flag clears the next time that exercise (or one of its regressions) is completed with `maxPain ≤ painLimit` and no early stop — it does not expire on a timer.
 
 ### 5.6 Update Variation History
 
@@ -850,7 +906,7 @@ Record movement pattern, family, and variant.
 
 ### 5.7 Update Today Progress
 
-Increase daily stimulus score.
+Increase daily stimulus score (5.4's `stimulusEarned`, regardless of whether it also grew the permanent capability score).
 
 ## 6. Daily Progress
 
@@ -901,6 +957,8 @@ Examples:
 - walk_easy
 - rollerblade_easy
 
+Each of these still needs full SkiPrepCoach metadata authored — `movementPattern` (2.5), `recoveryClass`, `riskLevel`, `capabilityEffects`, `fatigueCost`, `substitutes`/`regressions`/`progressions` — before it can be recommended. Only the Barbell Romanian Deadlift (2.6) is fully specified as an example so far.
+
 More exercises can be imported from Free Exercise DB, but each needs SkiPrepCoach metadata before recommendation.
 
 ## 8. MVP Development Order
@@ -924,7 +982,7 @@ SkiPrepCoach is not a workout calendar.
 
 It is a closed-loop coaching engine.
 
-Each recommendation is based on the current state of the athlete, and each completed action changes that state.
+Each recommendation is based on the current state of the athlete, and each completed action changes that state. The engine has no concept of calendar time, deadlines, or seasons — it never reasons about "days until ski season" or paces itself against a target date. It only ever answers "what's the best next action given exactly where things stand right now."
 
 The app's intelligence comes from the quality of:
 
@@ -935,3 +993,29 @@ The app's intelligence comes from the quality of:
 - the `next` decision logic
 
 The UI exists only to show the next action and collect the result.
+
+## 10. Resolved Parameters Reference
+
+Quick lookup for every constant/formula decided during spec review, so implementation doesn't have to re-derive them:
+
+| Parameter | Value |
+|---|---|
+| Capability score scale | 0–100 |
+| Capability target formula | `min(100, 25 + 5 × priority)` (2.3) |
+| Daily stimulus target | fixed **70**, same for every user/day (Step 4) |
+| Capability growth learning rate | **0.1** (5.4) |
+| Movement pattern taxonomy | squat, hinge, lunge, push, pull, rotation, gait_locomotion (2.5) |
+| Recovery bucket scope | per `(movementPattern, recoveryClass)` pair, not per exercise (2.8) |
+| Fatigue decay | exponential; half-life = that bucket's `recoveryClass.halfLifeHours` (2.8) |
+| `halfLifeHours` defaults | daily 9h, light 18h, moderate 36h, heavy_strength 72h, max_strength 108h, plyometric 72h, hiit 72h |
+| Limiting-capability scoring boost | 1.5× (Step 5 / Step 7) |
+| Enjoyment bonus | flat **+10** (Step 7) |
+| Risk penalty | riskLevel baseline (low 0 / moderate 5 / high 15) **+30** if `elevatedRisk` flagged (Step 7, 5.5) |
+| Repetition penalty | recency-decayed over ~3 days (Step 7 / Step 8) |
+| `recommendationId` lifecycle | pinned until resolved via `POST /result`, or recomputed after a 4h timeout (3.1) |
+| Equipment/location context | not modeled for MVP; all `availableEquipment` assumed accessible (Step 6) |
+| Dose progression ("level") | purely per-exercise history-driven; no separate level field (Step 9) |
+| Readiness inputs | manual entry only for MVP; no biometric/wearable integration (2.10) |
+| Day boundary | user profile `timezone` field; resets at local midnight (2.1) |
+| Rest actions | same recommendation lifecycle as exercises; logged as an event once acknowledged (2.9, 3.1) |
+| Time-to-goal concept | **none** — no deadlines, countdowns, or seasons anywhere in the engine (Section 9) |
