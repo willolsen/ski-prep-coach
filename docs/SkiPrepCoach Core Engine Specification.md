@@ -208,25 +208,71 @@ Every exercise has exactly one primary `movementPattern`, used for variation log
 
 ### 2.6 Exercise Definition
 
-Base exercise information. This should be compatible with Free Exercise DB style fields, then extended. `movementPattern` must be one of the 7 ids in 2.5.
+Built on top of the [free-exercise-db](https://github.com/yuhonas/free-exercise-db) schema ([schema.json](https://github.com/yuhonas/free-exercise-db/blob/main/schema.json)) as the base layer, extended with SkiPrepCoach-specific fields. **free-exercise-db is the primary source for exercise data** — its 800+ exercises can be dropped in with zero field-mapping; each only needs the SkiPrepCoach extension fields authored before it's eligible for recommendation (see Section 7).
+
+**Base fields** (verbatim from free-exercise-db):
+
+| field | type | notes |
+|---|---|---|
+| `id` | string | pattern `^[0-9a-zA-Z_-]+$` |
+| `name` | string | |
+| `force` | `null \| "static" \| "pull" \| "push"` | |
+| `level` | `"beginner" \| "intermediate" \| "expert"` | |
+| `mechanic` | `null \| "isolation" \| "compound"` | |
+| `equipment` | `null \| "medicine ball" \| "dumbbell" \| "body only" \| "bands" \| "kettlebells" \| "foam roll" \| "cable" \| "machine" \| "barbell" \| "exercise ball" \| "e-z curl bar" \| "other"` | single value, not an array |
+| `primaryMuscles` | array of muscle enum | abdominals, abductors, adductors, biceps, calves, chest, forearms, glutes, hamstrings, lats, lower back, middle back, neck, quadriceps, shoulders, traps, triceps |
+| `secondaryMuscles` | array, same muscle enum | |
+| `instructions` | array of strings | |
+| `category` | `"powerlifting" \| "strength" \| "stretching" \| "cardio" \| "olympic weightlifting" \| "strongman" \| "plyometrics"` | |
+| `images` | array of strings | relative paths into the free-exercise-db image set |
+
+**SkiPrepCoach extension fields** (not part of free-exercise-db; required for an exercise to be recommendable):
+
+| field | purpose |
+|---|---|
+| `baseSource` | `"free-exercise-db"` or `"custom"` — provenance. `"custom"` is for exercises authored specifically for SkiPrepCoach with no free-exercise-db equivalent (most of the MVP set in Section 7) |
+| `icon` | display emoji |
+| `movementPattern` | one of the 7 ids in 2.5 — free-exercise-db has no equivalent concept |
+| `familyId` | groups variants for Step 8 variation logic |
+| `variantTags` | free-form tags used in scoring/variation |
+| `safetyNotes` | shown to the user; distinct from `instructions` |
+| `requiresWarmth` | minimum warmth state (2.11) required |
+| `riskLevel` | baseline risk penalty input (Step 7) |
+| `recoveryClass` | 2.8 |
+| `snackSafeWhenCold` | whether this can be done without a warm-up |
+| `capabilityEffects` | per-capability stimulus value (5.4) |
+| `fatigueCost` | per-capability/tissue fatigue added (5.3) |
+| `substitutes` | alternate exercises for the same slot |
+| `regressions` | easier variants (Step 8) |
+| `progressions` | harder variants (Step 8) |
+
+Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Romanian_Deadlift.json), base fields exactly as published, extended with SkiPrepCoach fields:
 
 ```json
 {
-  "id": "romanian_deadlift_barbell",
-  "name": "Barbell Romanian Deadlift",
-  "icon": "🏋",
+  "id": "Romanian_Deadlift",
+  "name": "Romanian Deadlift",
+  "force": "pull",
+  "level": "intermediate",
+  "mechanic": "compound",
+  "equipment": "barbell",
+  "primaryMuscles": ["hamstrings"],
+  "secondaryMuscles": ["calves", "glutes", "lower back"],
+  "instructions": [
+    "Put a barbell in front of you on the ground and grab it using a pronated (palms facing down) grip that a little wider than shoulder width.",
+    "Bend the knees slightly and keep the shins vertical, hips back and back straight. This will be your starting position.",
+    "Keeping your back and arms completely straight at all times, use your hips to lift the bar as you exhale.",
+    "Once you are standing completely straight up, lower the bar by pushing the hips back, only slightly bending the knees, unlike when squatting.",
+    "Repeat for the recommended amount of repetitions."
+  ],
+  "category": "strength",
+  "images": ["Romanian_Deadlift/0.jpg", "Romanian_Deadlift/1.jpg"],
+
   "baseSource": "free-exercise-db",
+  "icon": "🏋",
   "movementPattern": "hinge",
   "familyId": "hip_hinge",
   "variantTags": ["barbell", "bilateral", "posterior_chain", "strength"],
-  "equipment": ["barbell", "plates"],
-  "bodyParts": ["hamstrings", "glutes", "back"],
-  "instructions": [
-    "Stand tall holding the barbell in front of your thighs.",
-    "Hinge at the hips while keeping your back neutral.",
-    "Lower until you feel a hamstring stretch.",
-    "Return to standing by driving the hips forward."
-  ],
   "safetyNotes": [
     "Do not round the lower back.",
     "Do not perform cold.",
@@ -248,20 +294,21 @@ Base exercise information. This should be compatible with Free Exercise DB style
     "knee_capacity": 4
   },
   "substitutes": [
-    "romanian_deadlift_dumbbell",
+    "Stiff-Legged_Dumbbell_Deadlift",
     "kettlebell_deadlift",
     "hip_hinge_dowel"
   ],
   "regressions": [
     "hip_hinge_dowel",
-    "romanian_deadlift_dumbbell_light"
+    "romanian_deadlift_light"
   ],
   "progressions": [
-    "romanian_deadlift_barbell_heavy",
-    "single_leg_rdl"
+    "Kettlebell_One-Legged_Deadlift"
   ]
 }
 ```
+
+`Stiff-Legged_Dumbbell_Deadlift` and `Kettlebell_One-Legged_Deadlift` are real free-exercise-db entries. `kettlebell_deadlift` (plain bilateral), `hip_hinge_dowel`, and `romanian_deadlift_light` are `baseSource: "custom"` — dose variants and coaching-cue drills that don't exist as distinct database entries.
 
 `capabilityEffects` is also the basis for stimulus and capability growth (5.4), and `fatigueCost` is also the basis for the fatigue penalty in scoring (Step 7).
 
@@ -730,7 +777,7 @@ Example blocked exercise:
 
 ```json
 {
-  "exerciseId": "romanian_deadlift_barbell",
+  "exerciseId": "Romanian_Deadlift",
   "blocked": true,
   "reasonCodes": ["not_warm_enough"]
 }
@@ -786,8 +833,8 @@ Example:
 ```json
 {
   "movementPattern": "hinge",
-  "recentVariants": ["romanian_deadlift_barbell"],
-  "suggestedVariant": "romanian_deadlift_dumbbell",
+  "recentVariants": ["Romanian_Deadlift"],
+  "suggestedVariant": "Stiff-Legged_Dumbbell_Deadlift",
   "reason": "same pattern, less repetition, appropriate load"
 }
 ```
@@ -940,26 +987,26 @@ Start with a small curated subset.
 
 Examples:
 
-- wall_sit
-- bodyweight_squat
-- step_up_low
-- calf_raise
-- single_leg_balance
-- ankle_rocker
-- hip_flexor_stretch
-- ninety_ninety
-- dead_bug
-- pushup
-- farmer_carry
-- goblet_squat
-- romanian_deadlift_dumbbell
-- bike_easy
-- walk_easy
-- rollerblade_easy
+- wall_sit *(custom — no free-exercise-db equivalent)*
+- bodyweight_squat *(custom)*
+- step_up_low *(custom)*
+- calf_raise *(custom)*
+- single_leg_balance *(custom)*
+- ankle_rocker *(custom)*
+- hip_flexor_stretch *(custom)*
+- ninety_ninety *(custom)*
+- dead_bug *(custom)*
+- pushup *(custom)*
+- farmer_carry *(custom)*
+- goblet_squat *(custom)*
+- Stiff-Legged_Dumbbell_Deadlift *(free-exercise-db)*
+- bike_easy *(custom)*
+- walk_easy *(custom)*
+- rollerblade_easy *(custom)*
 
-Each of these still needs full SkiPrepCoach metadata authored — `movementPattern` (2.5), `recoveryClass`, `riskLevel`, `capabilityEffects`, `fatigueCost`, `substitutes`/`regressions`/`progressions` — before it can be recommended. Only the Barbell Romanian Deadlift (2.6) is fully specified as an example so far.
+Each of these still needs full SkiPrepCoach metadata authored — `movementPattern` (2.5), `recoveryClass`, `riskLevel`, `capabilityEffects`, `fatigueCost`, `substitutes`/`regressions`/`progressions` — before it can be recommended. Only `Romanian_Deadlift` (2.6) is fully specified as an example so far.
 
-More exercises can be imported from Free Exercise DB, but each needs SkiPrepCoach metadata before recommendation.
+More exercises can be imported from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) — the primary source for exercise data (2.6) — but each still needs SkiPrepCoach metadata before recommendation.
 
 ## 8. MVP Development Order
 
