@@ -12,8 +12,6 @@ Stores stable user-level information.
 {
   "userId": "user-001",
   "displayName": "Will",
-  "primaryGoal": "ski_resilience",
-  "timezone": "America/Los_Angeles",
   "availableEquipment": [
     "gym",
     "dumbbells",
@@ -38,9 +36,9 @@ Stores stable user-level information.
 
 Used by `next` logic to filter exercises, prioritize goals, and bias recommendations toward enjoyable options.
 
-`timezone` defines the athlete's local day boundary — daily stimulus ([Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today)) and recovery-class `maxPerDay` counters ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)) reset at local midnight in this timezone.
+There is deliberately no `primaryGoal` field — that information is already implied by which capabilities (2.2) exist and how they're prioritized, so a separate goal label would just be redundant with data the engine already has. There is likewise deliberately no `targetDate` or deadline field — the engine has no concept of time remaining toward a goal.
 
-There is deliberately no `targetDate` or deadline field — the engine has no concept of time remaining toward a goal.
+There is also no `timezone` field. Day-boundary calculations ([Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today), [2.8](./03-exercises-and-recovery.md#28-recovery-classes)) need the athlete's *current* local timezone, not a fixed stored one — so the client sends it with every request where the server needs to know "what day is it," rather than the server trusting a profile field that could go stale (e.g. while traveling). See [2.9](./04-history-and-readiness.md#29-user-activity-history) and [3.1](./05-server-api.md#31-get-next-action) for where it's actually supplied.
 
 ## 2.2 Capability Definitions
 
@@ -51,53 +49,43 @@ Capabilities are things the engine tries to improve.
   "capabilities": {
     "knee_capacity": {
       "name": "Knee Capacity",
-      "icon": "🦵",
       "priority": 10,
       "description": "Ability of knees and surrounding tissues to tolerate skiing-relevant load."
     },
     "lower_body_strength": {
       "name": "Lower Body Strength",
-      "icon": "🦿",
       "priority": 9
     },
     "posterior_chain": {
       "name": "Posterior Chain",
-      "icon": "🍑",
       "priority": 8
     },
     "balance": {
       "name": "Balance",
-      "icon": "⚖",
       "priority": 9
     },
     "mobility": {
       "name": "Mobility",
-      "icon": "🤸",
       "priority": 7
     },
     "aerobic_endurance": {
       "name": "Aerobic Endurance",
-      "icon": "🚴",
       "priority": 7
     },
     "stamina": {
       "name": "Stamina",
-      "icon": "🔥",
       "priority": 8
     },
     "reaction": {
       "name": "Reaction",
-      "icon": "⚡",
       "priority": 6
     },
     "upper_body_strength": {
       "name": "Upper Body Strength",
-      "icon": "💪",
       "priority": 5
     },
     "fall_resilience": {
       "name": "Fall Resilience",
-      "icon": "🛡",
       "priority": 6
     }
   }

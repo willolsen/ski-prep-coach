@@ -16,6 +16,7 @@ Every completed or attempted action is stored as an event — including acknowle
       "userId": "user-001",
       "type": "exercise_result",
       "source": "live",
+      "timezone": "America/Los_Angeles",
       "startedAt": "2026-07-04T09:00:00-07:00",
       "completedAt": "2026-07-04T09:04:00-07:00",
       "exerciseId": "wall_sit",
@@ -39,6 +40,8 @@ Every completed or attempted action is stored as an event — including acknowle
 ```
 
 `source` is `"live"` for events logged through the normal `GET /next` → `POST /result` loop, or one of `"onboarding"` / `"self_directed"` for events inserted directly through [3.3](./05-server-api.md#33-logging-without-a-recommendation) (backfilled pre-first-use history, or an exercise the user did that wasn't the recommended action). All three are ordinary events and count identically in every derivation — `source` exists only for auditability (e.g. "show me what I logged myself vs. what the app recommended").
+
+**`timezone`** is supplied by the client with every write (3.2, 3.3) — there is no stored user-level timezone (2.1) to fall back on. It's stored per-event rather than assumed from a profile field so that day-boundary calculations ([5.7](./07-result-processing.md#57-daily-progress), [2.8](./03-exercises-and-recovery.md#28-recovery-classes)) stay correct even if the user's timezone changes over time (travel, relocation) — each event is grouped into "its" day using the timezone that was actually in effect when it happened, not whatever timezone happens to be current when the query runs.
 
 **`actual.notes`** is free text, always available on any event regardless of `source`, and stored verbatim. No derivation formula in this spec reads it — it exists purely so the user's own commentary ("knee felt a little off on the last rep," "did this outside instead of at the gym") isn't lost. Since it's just another field on a stored event, it's already retrievable by reading history; a dedicated "read your notes" view can be added later with zero data-model changes.
 

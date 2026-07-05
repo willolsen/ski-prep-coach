@@ -5,8 +5,10 @@
 ## 3.1 Get Next Action
 
 ```
-GET /api/users/{userId}/next
+GET /api/users/{userId}/next?timezone=America/Los_Angeles
 ```
+
+`timezone` is required — there's no stored user-level timezone (2.1) to fall back on. The engine needs the athlete's *current* local timezone to compute "today" for daily stimulus ([Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today)) and recovery-class daily counts ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)), and the client is the only party that reliably knows it right now.
 
 A `recommendationId` is generated whenever a new `nextAction` (exercise **or** rest) is produced. Calling `GET /next` again before that recommendation is resolved returns the identical pinned recommendation (same `recommendationId`) rather than recomputing — this prevents the action changing out from under the user mid-session. A pending recommendation that's never resolved expires and is recomputed fresh after 4 hours.
 
@@ -108,6 +110,7 @@ Body:
 {
   "recommendationId": "rec-20260704-001",
   "exerciseId": "wall_sit",
+  "timezone": "America/Los_Angeles",
   "startedAt": "2026-07-04T09:00:00-07:00",
   "completedAt": "2026-07-04T09:04:00-07:00",
   "actual": {
@@ -120,6 +123,8 @@ Body:
   }
 }
 ```
+
+`timezone` is the client's current timezone at submission time, stored on the event itself (2.9) rather than looked up from a profile — see [2.9](./04-history-and-readiness.md#29-user-activity-history) for why it's captured per-event instead of per-user.
 
 Server responsibility: **store the event** ([5.1](./07-result-processing.md#51-store-event)). That's the entire write. Warmth, fatigue, capability score, recovery eligibility, and daily progress are all derived from the event log on the next `GET /next` call ([Section 5](./07-result-processing.md)) — there's nothing else to update.
 
@@ -146,6 +151,7 @@ Body (batch, as onboarding typically needs; a self-directed log is usually just 
     {
       "exerciseId": "bodyweight_squat",
       "source": "onboarding",
+      "timezone": "America/Los_Angeles",
       "occurredAt": "2026-06-20T09:00:00-07:00",
       "actual": {
         "setsCompleted": 3,
@@ -157,6 +163,7 @@ Body (batch, as onboarding typically needs; a self-directed log is usually just 
     {
       "exerciseId": "rollerblade_easy",
       "source": "self_directed",
+      "timezone": "America/Los_Angeles",
       "occurredAt": "2026-07-05T18:30:00-07:00",
       "actual": {
         "durationSecCompleted": 1500,
@@ -170,6 +177,8 @@ Body (batch, as onboarding typically needs; a self-directed log is usually just 
 ```
 
 Each entry is stored as an ordinary `exercise_result` event ([2.9](./04-history-and-readiness.md#29-user-activity-history)) with `startedAt`/`completedAt` set from `occurredAt`. No `recommendationId` is needed or expected — unlike [3.2](#32-submit-result), these entries were never preceded by a `GET /next` call. Entries don't need a `prescribed` block either, since there was no prescription to compare against; dose ratio ([5.4](./07-result-processing.md#54-capability-score-growth)) falls back to 1.0.
+
+`timezone` is per-entry rather than one value for the whole batch, since an onboarding backfill can span weeks and, in principle, a trip through a different timezone — each entry's day-boundary calculations use whatever timezone was actually in effect for that entry.
 
 No eligibility or safety check applies to logging itself — this endpoint is a factual record of what the user says happened, not a request for a recommendation, so there's nothing to veto. Its consequences (fatigue added to the relevant bucket, capability growth, a possible `elevatedRisk` flag if pain was high) show up automatically the next time those are derived ([Section 5](./07-result-processing.md)), the same as for any other event.
 

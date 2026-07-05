@@ -83,7 +83,7 @@ The flag isn't "cleared" so much as it simply stops being true the next time tha
 
 ## 5.7 Daily Progress
 
-`currentStimulusScore` ([Section 6](./08-daily-progress.md)) is the sum of `stimulusEarned` ([5.4](#54-capability-score-growth)) across all of today's events (today defined by the user's `timezone`, [2.1](./02-capabilities.md#21-user-profile)), regardless of whether a given event's `scoreIncrement` was skipped. Trying hard on a rep scheme and stopping early due to discomfort still counts as useful stimulus for the day, even though it doesn't grow the permanent capability score.
+`currentStimulusScore` ([Section 6](./08-daily-progress.md)) is the sum of `stimulusEarned` ([5.4](#54-capability-score-growth)) across all of today's events (today defined by the `timezone` supplied with the current `GET /next` request, [3.1](./05-server-api.md#31-get-next-action) — each event's own stored `timezone`, [2.9](./04-history-and-readiness.md#29-user-activity-history), determines which day *it* falls on), regardless of whether a given event's `scoreIncrement` was skipped. Trying hard on a rep scheme and stopping early due to discomfort still counts as useful stimulus for the day, even though it doesn't grow the permanent capability score.
 
 ---
 

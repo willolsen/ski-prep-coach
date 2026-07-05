@@ -13,7 +13,7 @@ Load:
 - recovery classes
 - full event history (or as much of it as the derivations in [Section 5](./07-result-processing.md) need)
 - readiness state (today's manual entry, [2.10](./04-history-and-readiness.md#210-readiness-state))
-- current date/time (in the user's timezone, [2.1](./02-capabilities.md#21-user-profile))
+- current date/time (in the timezone supplied with this request, [3.1](./05-server-api.md#31-get-next-action) — not stored on the user profile)
 
 There is no separate "current capability state" to load — it doesn't exist as stored data. It's computed in Step 2 from the event history just loaded.
 

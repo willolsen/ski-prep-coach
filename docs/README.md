@@ -1,4 +1,4 @@
-# SkiPrepCoach — Core Engine Specification v0.5
+# SkiPrepCoach — Core Engine Specification v0.6
 
 SkiPrepCoach is a server-side decision engine that answers one question: **what is the best next action for this user right now?** The client is thin — it displays the recommended action, collects the result, and sends it back. See [Purpose & Core Principle](./spec/01-purpose-and-principles.md) for the full framing.
 

@@ -24,11 +24,12 @@ Quick lookup for every constant/formula decided during spec review, so implement
 | Equipment/location context | not modeled for MVP; all `availableEquipment` assumed accessible ([Step 6](./06-decision-pipeline.md#step-6--generate-candidate-actions)) |
 | Dose progression ("level") | purely per-exercise history-driven; no separate level field ([Step 9](./06-decision-pipeline.md#step-9--select-dose)) |
 | Readiness inputs | manual entry only for MVP; no biometric/wearable integration ([2.10](./04-history-and-readiness.md#210-readiness-state)) |
-| Day boundary | user profile `timezone` field; resets at local midnight ([2.1](./02-capabilities.md#21-user-profile)) |
+| Day boundary | no stored timezone — the client sends `timezone` with every `GET /next` call and every write ([3.1](./05-server-api.md#31-get-next-action), [2.9](./04-history-and-readiness.md#29-user-activity-history)); resets at local midnight in whichever timezone was current at the time |
 | Rest actions | same recommendation lifecycle as exercises; logged as an event once acknowledged ([2.9](./04-history-and-readiness.md#29-user-activity-history), [3.1](./05-server-api.md#31-get-next-action)) |
 | Logging without a recommendation | one endpoint covers both onboarding (`source: "onboarding"`, backfilled pre-first-use history) and self-directed logging (`source: "self_directed"`, an exercise done that wasn't recommended); same schema and full weight as live events, no `recommendationId` needed ([3.3](./05-server-api.md#33-logging-without-a-recommendation)) |
 | Notes | `actual.notes` is free text on every event regardless of source; stored verbatim, read by no current derivation, kept for possible future use ([2.9](./04-history-and-readiness.md#29-user-activity-history)) |
 | Time-to-goal concept | **none** — no deadlines, countdowns, or seasons anywhere in the engine ([Core Principle](./01-purpose-and-principles.md#9-core-principle)) |
+| Goal labeling | **none** — no `primaryGoal` field; which capabilities exist and how they're prioritized already implies the goal, so a separate label would be redundant ([2.1](./02-capabilities.md#21-user-profile)) |
 | Database | PostgreSQL everywhere (local Docker, AWS RDS, Azure Database for PostgreSQL) — recursive CTEs handle the capability-score fold, `jsonb` handles the variable `prescribed`/`actual` shape ([Section 11](./12-data-layer.md)) |
 | Server framework | Hono, not Express — official adapters for Node (local/container) and AWS Lambda; one shared app module, a thin entry point per deployment target ([Section 12](./13-server-framework.md)) |
 

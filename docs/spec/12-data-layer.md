@@ -33,15 +33,12 @@ Seeded from the JSON already defined in Section 2 — these are config data, not
 CREATE TABLE users (
   user_id       text PRIMARY KEY,
   display_name  text NOT NULL,
-  primary_goal  text NOT NULL,
-  timezone      text NOT NULL,
   profile       jsonb NOT NULL   -- availableEquipment, constraints, preferences (2.1)
 );
 
 CREATE TABLE capabilities (
   capability_id text PRIMARY KEY,   -- e.g. 'knee_capacity'
   name          text NOT NULL,
-  icon          text,
   priority      smallint NOT NULL,
   description   text,
   target        smallint GENERATED ALWAYS AS (LEAST(100, 25 + 5 * priority)) STORED   -- (2.3)
@@ -84,6 +81,7 @@ CREATE TABLE events (
   source            text NOT NULL,   -- 'live' | 'onboarding' | 'self_directed' (2.9, 3.3)
   exercise_id       text REFERENCES exercises(exercise_id),   -- null for rest events
   recommendation_id uuid,                                     -- null for onboarding/self-directed entries (3.3)
+  timezone          text NOT NULL,   -- client-supplied at submission time; no stored user-level timezone (2.1, 2.9)
   started_at        timestamptz NOT NULL,
   completed_at      timestamptz NOT NULL,
   prescribed        jsonb,           -- null when nothing was prescribed (3.3 entries)
@@ -201,7 +199,7 @@ WHERE e.user_id = $1 AND x.movement_pattern = $2 AND x.recovery_class = $3;
 ```
 
 - **Pain risk** ([5.5](./07-result-processing.md#55-pain-risk)): `SELECT actual FROM events WHERE user_id = $1 AND exercise_id = ANY($2) ORDER BY completed_at DESC LIMIT 1` — check `maxPain`/early-stop on the single most recent row for the exercise or its regressions.
-- **Daily progress** ([5.7](./07-result-processing.md#57-daily-progress)): `SUM` of stimulus, same shape as 11.5's `stimulus` CTE, filtered to `completed_at::date = today` in the user's timezone (2.1).
+- **Daily progress** ([5.7](./07-result-processing.md#57-daily-progress)): `SUM` of stimulus, same shape as 11.5's `stimulus` CTE, filtered to `(completed_at AT TIME ZONE e.timezone)::date = (now() AT TIME ZONE $2)::date` — each event's *own* stored `timezone` places it on a day, compared against the timezone supplied with the current request ($2).
 - **Variation history** ([5.6](./07-result-processing.md#56-variation-history)): plain `SELECT ... ORDER BY completed_at DESC LIMIT n`, no aggregation at all.
 
 ## 11.8 Multi-User & Indexing

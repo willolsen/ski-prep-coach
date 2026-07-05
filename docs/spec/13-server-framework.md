@@ -20,6 +20,7 @@ const app = new Hono()
 
 app.get('/api/users/:userId/next', async (c) => {
   const userId = c.req.param('userId')
+  const timezone = c.req.query('timezone')   // required, no stored fallback (3.1, 2.1)
   // ...decision pipeline (Section 4)...
   return c.json({ nextAction: { /* ... */ } })
 })
