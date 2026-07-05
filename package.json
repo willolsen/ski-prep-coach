@@ -1,0 +1,16 @@
+{
+  "name": "ski-prep-coach",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SkiPrepCoach closed-loop coaching engine",
+  "scripts": {
+    "sync:exercises": "tsx scripts/sync-exercise-db.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

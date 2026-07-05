@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.log
+
+# Fetched on demand by `npm run sync:exercises -- --with-images`; not committed (thousands of small binary files).
+data/free-exercise-db/images/
