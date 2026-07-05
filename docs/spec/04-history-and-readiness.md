@@ -95,18 +95,7 @@ Suggested states:
 }
 ```
 
-Example warmth effects (flat contribution per full-dose completion, decaying per [5.2](./07-result-processing.md#52-warmth)):
-
-```json
-{
-  "walk_5_min": 10,
-  "mobility_light": 8,
-  "wall_sit": 8,
-  "bodyweight_squat": 12,
-  "heavy_strength": 25,
-  "rollerblade_20_min": 35
-}
-```
+Each exercise carries its own flat `warmthEffect` scalar — a per-exercise field on the exercise definition (2.6), not a separate lookup table — contributed per full-dose completion and decaying per [5.2](./07-result-processing.md#52-warmth). A brisk walk or heavy strength work naturally has a higher `warmthEffect` than a light mobility drill.
 
 Used to block cold-unsafe exercises and sequence actions naturally.
 

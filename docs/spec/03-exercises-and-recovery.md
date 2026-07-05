@@ -52,6 +52,7 @@ Built on top of the [free-exercise-db](https://github.com/yuhonas/free-exercise-
 | `snackSafeWhenCold` | whether this can be done without a warm-up |
 | `capabilityEffects` | per-capability stimulus value ([5.4](./07-result-processing.md#54-capability-score-growth)) |
 | `fatigueCost` | single scalar — fatigue contributed to this exercise's `(movementPattern, recoveryClass)` bucket per full-dose completion ([5.3](./07-result-processing.md#53-fatigue)). Not per-capability: fatigue is tracked only at the bucket level (2.8), so there's nothing to break down by capability |
+| `warmthEffect` | single scalar — warmth contributed per full-dose completion ([5.2](./07-result-processing.md#52-warmth); see [2.11](./04-history-and-readiness.md#211-warmth-state)) |
 | `substitutes` | alternate exercises for the same slot |
 | `regressions` | easier variants ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) |
 | `progressions` | harder variants ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) |
@@ -98,6 +99,7 @@ Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/bl
     "fall_resilience": 2
   },
   "fatigueCost": 20,
+  "warmthEffect": 25,
   "substitutes": [
     "Stiff-Legged_Dumbbell_Deadlift",
     "kettlebell_deadlift",

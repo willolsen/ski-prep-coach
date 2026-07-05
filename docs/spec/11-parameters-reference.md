@@ -1,6 +1,6 @@
 # 10. Resolved Parameters Reference
 
-[← Index](../README.md) · Previous: [MVP Development Order](./10-mvp-development-order.md)
+[← Index](../README.md) · Previous: [MVP Development Order](./10-mvp-development-order.md) · Next: [Data Layer →](./12-data-layer.md)
 
 Quick lookup for every constant/formula decided during spec review, so implementation doesn't have to re-derive them:
 
@@ -29,7 +29,8 @@ Quick lookup for every constant/formula decided during spec review, so implement
 | Logging without a recommendation | one endpoint covers both onboarding (`source: "onboarding"`, backfilled pre-first-use history) and self-directed logging (`source: "self_directed"`, an exercise done that wasn't recommended); same schema and full weight as live events, no `recommendationId` needed ([3.3](./05-server-api.md#33-logging-without-a-recommendation)) |
 | Notes | `actual.notes` is free text on every event regardless of source; stored verbatim, read by no current derivation, kept for possible future use ([2.9](./04-history-and-readiness.md#29-user-activity-history)) |
 | Time-to-goal concept | **none** — no deadlines, countdowns, or seasons anywhere in the engine ([Core Principle](./01-purpose-and-principles.md#9-core-principle)) |
+| Database | PostgreSQL everywhere (local Docker, AWS RDS, Azure Database for PostgreSQL) — recursive CTEs handle the capability-score fold, `jsonb` handles the variable `prescribed`/`actual` shape ([Section 11](./12-data-layer.md)) |
 
 ---
 
-[← Index](../README.md) · Previous: [MVP Development Order](./10-mvp-development-order.md)
+[← Index](../README.md) · Previous: [MVP Development Order](./10-mvp-development-order.md) · Next: [Data Layer →](./12-data-layer.md)
