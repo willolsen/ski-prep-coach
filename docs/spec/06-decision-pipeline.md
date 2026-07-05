@@ -12,8 +12,8 @@ Load:
 - exercise library
 - recovery classes
 - full event history (or as much of it as the derivations in [Section 5](./07-result-processing.md) need)
-- readiness state (today's manual entry, [2.10](./04-history-and-readiness.md#210-readiness-state))
-- current date/time (in the timezone supplied with this request, [3.1](./05-server-api.md#31-get-next-action) — not stored on the user profile)
+- readiness state (today's manual entry, [2.10](./04-history-and-readiness.md#210-readiness-state), where "today" is `now` converted to the request's `timezone`)
+- `now` and `timezone`, both supplied with this request ([3.1](./05-server-api.md#31-get-next-action) — `now` defaults to the real clock if omitted, `timezone` is required; neither is stored on the user profile). Every derivation in Step 2 that depends on "now" uses this exact value, not an independent clock read (see the [Core Principle](./01-purpose-and-principles.md#9-core-principle) note on why)
 
 There is no separate "current capability state" to load — it doesn't exist as stored data. It's computed in Step 2 from the event history just loaded.
 
@@ -21,7 +21,7 @@ There is no separate "current capability state" to load — it doesn't exist as 
 
 Before choosing an action, compute fresh from the event history (nothing here is read from a cache that could be stale — see [Section 5](./07-result-processing.md) for each formula):
 
-- capability scores and trends ([2.4](./02-capabilities.md#24-capability-state-derived))
+- capability scores ([2.4](./02-capabilities.md#24-capability-state-derived))
 - current warmth ([5.2](./07-result-processing.md#52-warmth))
 - decayed fatigue per `(movementPattern, recoveryClass)` bucket ([5.3](./07-result-processing.md#53-fatigue))
 - recovered buckets (hard eligibility gate, [2.8](./03-exercises-and-recovery.md#28-recovery-classes))
@@ -40,7 +40,7 @@ Immediately return rest/recovery if:
 
 - pain now ≥4
 - swelling reported
-- limp or instability reported
+- limp or instability reported (`stairs` is `"difficult"` or `"unable"`, [2.10](./04-history-and-readiness.md#210-readiness-state))
 - severe next-morning pain response
 - red readiness state
 - unsafe fatigue accumulation (`aggregateFatigue` ≥ 100 — see [2.10](./04-history-and-readiness.md#210-readiness-state))

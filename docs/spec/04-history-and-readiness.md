@@ -82,13 +82,23 @@ Computed from recent manual reports. For MVP this is **manual entry only** — n
 }
 ```
 
+Fields:
+
+- `painNow` — 0–10.
+- `morningStiffness` — `"none" | "mild" | "significant"`.
+- `swelling` — boolean.
+- `stairs` — `"easy" | "difficult" | "unable"`.
+- `sleepQuality` — `"good" | "fair" | "poor"`.
+- `date` — **not submitted directly.** It's derived at write time ([3.4](./05-server-api.md#34-submit-readiness)) from the submitted `now` converted into the submitted `timezone`'s calendar date, the same way every other day-boundary in this spec is computed (Step 4, 2.8, 5.7) — kept out of client control so it can never disagree with those.
+- `computedStatus` — derived and stored at write time (see below); the one place a history-dependent derived value is persisted rather than recomputed on read, because it needs to be cheap to check on every subsequent `GET /next` rather than replayed from scratch each time.
+
 Rules:
 
-- Red if swelling, limp, or pain ≥4.
-- Yellow if pain 2–3, poor sleep, or `aggregateFatigue` ≥ 60.
+- Red if `swelling`, `stairs` is `"difficult"` or `"unable"`, or `painNow` ≥4.
+- Yellow if `painNow` 2–3, `sleepQuality` is `"poor"`, or `aggregateFatigue` ≥ 60.
 - Green if low pain, no swelling, normal movement, and `aggregateFatigue` < 60.
 
-`aggregateFatigue` is the single highest current bucket fatigue across all `(movementPattern, recoveryClass)` buckets ([5.3](./07-result-processing.md#53-fatigue)) — computed at the same moment `computedStatus` is derived, using whichever bucket is most taxed right now, not a sum across all of them. This is also what [Step 3](./06-decision-pipeline.md#step-3--safety-veto)'s "unsafe fatigue accumulation" veto checks, at a higher threshold (≥ 100). Both 60 and 100 are starting points to tune once there's real usage data.
+`aggregateFatigue` is the single highest current bucket fatigue across all `(movementPattern, recoveryClass)` buckets ([5.3](./07-result-processing.md#53-fatigue)) — computed as of the same `now` submitted with this readiness entry, using whichever bucket is most taxed right now, not a sum across all of them. This is also what [Step 3](./06-decision-pipeline.md#step-3--safety-veto)'s "unsafe fatigue accumulation" veto checks, at a higher threshold (≥ 100). Both 60 and 100 are starting points to tune once there's real usage data.
 
 Used early in the `next` pipeline.
 

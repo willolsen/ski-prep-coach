@@ -21,7 +21,8 @@ const app = new Hono()
 app.get('/api/users/:userId/next', async (c) => {
   const userId = c.req.param('userId')
   const timezone = c.req.query('timezone')   // required, no stored fallback (3.1, 2.1)
-  // ...decision pipeline (Section 4)...
+  const now = c.req.query('now') ?? new Date().toISOString()   // optional; real clock only lives here, at the edge (3.1)
+  // ...decision pipeline (Section 4), passed `now` explicitly — nothing downstream calls new Date() or the DB's now()...
   return c.json({ nextAction: { /* ... */ } })
 })
 
@@ -37,6 +38,14 @@ app.post('/api/users/:userId/log', async (c) => {
   const { entries } = await c.req.json()
   // ...insert events with source: "onboarding" | "self_directed" (3.3)...
   return c.json({ status: 'ok' })
+})
+
+app.post('/api/users/:userId/readiness', async (c) => {
+  const userId = c.req.param('userId')
+  const body = await c.req.json()
+  const now = body.now ?? new Date().toISOString()   // same pattern as GET /next (3.4)
+  // ...derive date from (now, timezone), compute aggregateFatigue as of now, upsert...
+  return c.json({ date: '2026-07-04', computedStatus: 'green' })
 })
 
 export default app
@@ -60,7 +69,7 @@ export const handler = handle(app)
 
 ## 12.3 Routes
 
-The three endpoints in [Section 3](./05-server-api.md) map onto Hono routes directly, as shown in 12.2: `GET /api/users/:userId/next` (3.1), `POST /api/users/:userId/results` (3.2), `POST /api/users/:userId/log` (3.3). Each handler is where the decision pipeline (Section 4), result-processing derivations (Section 5), and data-layer queries (Section 11) actually get invoked — this spec doesn't prescribe internal handler structure beyond that mapping.
+The four endpoints in [Section 3](./05-server-api.md) map onto Hono routes directly, as shown in 12.2: `GET /api/users/:userId/next` (3.1), `POST /api/users/:userId/results` (3.2), `POST /api/users/:userId/log` (3.3), `POST /api/users/:userId/readiness` (3.4). Each handler is where the decision pipeline (Section 4), result-processing derivations (Section 5), and data-layer queries (Section 11) actually get invoked — this spec doesn't prescribe internal handler structure beyond that mapping. `now` is parsed once at the edge, in the handler, per the [Core Principle](./01-purpose-and-principles.md#9-core-principle) — nothing in the pipeline or query layer should call `new Date()` or rely on the database's own `now()`.
 
 ## 12.4 Local Development
 

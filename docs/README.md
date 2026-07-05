@@ -1,8 +1,8 @@
-# SkiPrepCoach — Core Engine Specification v0.7
+# SkiPrepCoach — Core Engine Specification v0.8
 
 SkiPrepCoach is a server-side decision engine that answers one question: **what is the best next action for this user right now?** The client is thin — it displays the recommended action, collects the result, and sends it back. See [Purpose & Core Principle](./spec/01-purpose-and-principles.md) for the full framing.
 
-The engine persists almost nothing on its own: the event log of every action performed is the sole source of truth, and capability score, fatigue, warmth, pain-risk flags, and daily progress are all computed from it on demand rather than stored separately. See the [Core Principle](./spec/01-purpose-and-principles.md#9-core-principle) for why.
+The engine persists almost nothing on its own: the event log of every action performed is the sole source of truth, and capability score, fatigue, warmth, pain-risk flags, and daily progress are all computed from it on demand rather than stored separately. See the [Core Principle](./spec/01-purpose-and-principles.md#9-core-principle) for why. Time follows the same philosophy: `now` is always an explicit input, never read ambiently from the system clock, which is what makes the whole pipeline simulatable in tests without waiting in real time.
 
 The spec is split into one file per part, so each can be read, edited, or reviewed independently.
 
@@ -14,7 +14,7 @@ The spec is split into one file per part, so each can be read, edited, or review
 | 2.1–2.4 | [Data Model: User Profile & Capabilities](./spec/02-capabilities.md) | User profile, capability definitions, derived capability targets, capability state (computed from history, not stored) |
 | 2.5–2.8 | [Data Model: Exercises & Recovery](./spec/03-exercises-and-recovery.md) | Movement pattern taxonomy, exercise schema (built on [free-exercise-db](https://github.com/yuhonas/free-exercise-db) — exercises don't reference each other, `familyId`/`progressionLevel` replace stored substitute/regression/progression lists), prescriptions, recovery classes & fatigue decay |
 | 2.9–2.11 | [Data Model: History & Readiness](./spec/04-history-and-readiness.md) | Activity history events (the one thing that's actually stored), readiness state, warmth state (general + per-movement-pattern) |
-| 3 | [Server API](./spec/05-server-api.md) | `GET /next`, `POST /result`, and logging without a recommendation (onboarding backfill and self-directed exercises) |
+| 3 | [Server API](./spec/05-server-api.md) | `GET /next` (takes an explicit `now`), `POST /result`, logging without a recommendation (onboarding backfill and self-directed exercises), and submitting readiness |
 | 4 | [Next Decision Pipeline](./spec/06-decision-pipeline.md) | The 10-step algorithm from loading state to building the explanation |
 | 5 | [Submitting a Result](./spec/07-result-processing.md) | The one real write (store the event) plus every derivation formula (warmth, fatigue, capability growth, pain risk, variation history, daily progress) |
 | 6 | [Daily Progress](./spec/08-daily-progress.md) | The "have we done enough today" view |

@@ -103,20 +103,23 @@ CREATE INDEX events_user_exercise_time_idx ON events (user_id, exercise_id, comp
 
 CREATE TABLE readiness_entries (
   user_id         text NOT NULL REFERENCES users(user_id),
-  date            date NOT NULL,
+  date            date NOT NULL,    -- derived from (now, timezone) at write time (3.4), never submitted directly
   entry           jsonb NOT NULL,   -- painNow, morningStiffness, swelling, stairs, sleepQuality (2.10)
-  computed_status text NOT NULL,    -- green/yellow/red
+  computed_status text NOT NULL,    -- green/yellow/red, computed once at write time using aggregateFatigue as of that same `now` (11.6)
   PRIMARY KEY (user_id, date)
 );
+-- Written via INSERT ... ON CONFLICT (user_id, date) DO UPDATE — resubmitting for the same derived date overwrites it (3.4)
 
 CREATE TABLE pending_recommendations (
   recommendation_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           text NOT NULL UNIQUE REFERENCES users(user_id),   -- one pending recommendation per user
   next_action       jsonb NOT NULL,   -- the full nextAction payload (3.1)
-  created_at        timestamptz NOT NULL DEFAULT now(),
-  expires_at        timestamptz NOT NULL
+  created_at        timestamptz NOT NULL DEFAULT now(),   -- bookkeeping only (real row-insert time); not read by any derivation
+  expires_at        timestamptz NOT NULL                  -- set explicitly by the app as (request now) + 4 hours, not derived from created_at
 );
 ```
+
+`created_at` on this table and on `events` is pure bookkeeping — when the row actually landed in the database — and is the one place `DEFAULT now()` is fine to leave as the database's real clock, since nothing in Section 5 reads it. `expires_at` is different: it's set by the application at insert time to the *request's* `now` plus 4 hours, and checked against the *request's* `now` on every later `GET /next` — never the database's own `now()` — so a test can create a recommendation at a simulated instant and later verify it's expired at simulated instant + 5 hours without any real waiting.
 
 **`dose_ratio`** and **`clean_completion`** deserve a note, since at first glance they look like exactly the kind of stored derived state Section 9 argues against. They aren't: both are pure, deterministic functions of *that same row's own* `prescribed`/`actual` fields — never a function of other rows — so they can't drift out of sync with anything, the same way a `GENERATED ALWAYS AS` column can't. They exist purely to avoid re-deriving "was this a clean completion, and what fraction of the prescription did it represent" via a sprawling `CASE` expression (duration vs. reps vs. sets) in every query that needs it ([5.4](./07-result-processing.md#54-capability-score-growth)). In practice these would be computed application-side at write time (the shape-sniffing logic reads more naturally in TypeScript than SQL) rather than as generated columns, but the principle is the same: derived from sibling fields on an immutable, append-only row, not cross-row state.
 
@@ -165,14 +168,14 @@ This will get refined once it's real code (indexing, ties, capabilities with zer
 
 ## 11.6 Deriving Fatigue and Warmth
 
-No recursion needed — these are decayed sums, not compounding folds, so a straight aggregate works ([5.3](./07-result-processing.md#53-fatigue), [5.2](./07-result-processing.md#52-warmth)):
+No recursion needed — these are decayed sums, not compounding folds, so a straight aggregate works ([5.3](./07-result-processing.md#53-fatigue), [5.2](./07-result-processing.md#52-warmth)). Every `now()` a real-time version of this query would use is instead `$2`, the `now` supplied with the request ([3.1](./05-server-api.md#31-get-next-action)) — never the database's own clock, per the [Core Principle](./01-purpose-and-principles.md#9-core-principle):
 
 ```sql
 -- Fatigue per (movementPattern, recoveryClass) bucket
 SELECT
   x.movement_pattern, x.recovery_class,
   SUM(e.dose_ratio * x.fatigue_cost *
-      POWER(0.5, EXTRACT(EPOCH FROM (now() - e.completed_at)) / 3600.0 / rc.half_life_hours)
+      POWER(0.5, EXTRACT(EPOCH FROM ($2::timestamptz - e.completed_at)) / 3600.0 / rc.half_life_hours)
   ) AS bucket_fatigue
 FROM events e
 JOIN exercises x ON x.exercise_id = e.exercise_id
@@ -185,21 +188,21 @@ GROUP BY x.movement_pattern, x.recovery_class;
 -- General warmth (20-minute half-life; anything older than ~3 hours is negligible, so the window filter is just an optimization)
 SELECT SUM(
   e.dose_ratio * x.warmth_effect *
-  POWER(0.5, EXTRACT(EPOCH FROM (now() - e.completed_at)) / 60.0 / 20.0)
+  POWER(0.5, EXTRACT(EPOCH FROM ($2::timestamptz - e.completed_at)) / 60.0 / 20.0)
 ) AS general_warmth
 FROM events e
 JOIN exercises x ON x.exercise_id = e.exercise_id
-WHERE e.user_id = $1 AND e.completed_at > now() - interval '3 hours';
+WHERE e.user_id = $1 AND e.completed_at > $2::timestamptz - interval '3 hours';
 
 -- Per-movement-pattern warmth: same query, grouped by pattern instead of summed across all of them
 SELECT
   x.movement_pattern,
   SUM(e.dose_ratio * x.warmth_effect *
-      POWER(0.5, EXTRACT(EPOCH FROM (now() - e.completed_at)) / 60.0 / 20.0)
+      POWER(0.5, EXTRACT(EPOCH FROM ($2::timestamptz - e.completed_at)) / 60.0 / 20.0)
   ) AS pattern_warmth
 FROM events e
 JOIN exercises x ON x.exercise_id = e.exercise_id
-WHERE e.user_id = $1 AND e.completed_at > now() - interval '3 hours'
+WHERE e.user_id = $1 AND e.completed_at > $2::timestamptz - interval '3 hours'
 GROUP BY x.movement_pattern;
 ```
 
@@ -231,15 +234,16 @@ Simpler variations of the same patterns — grouped counts/timestamps, or a most
 -- Recovery-class hard eligibility gate for a given bucket (Step 6)
 SELECT
   MAX(e.completed_at) AS last_done_at,
-  COUNT(*) FILTER (WHERE e.completed_at > now() - interval '1 day') AS today_count,
-  COUNT(*) FILTER (WHERE e.completed_at > now() - interval '7 days') AS week_count
+  COUNT(*) FILTER (WHERE e.completed_at > $4::timestamptz - interval '1 day') AS today_count,
+  COUNT(*) FILTER (WHERE e.completed_at > $4::timestamptz - interval '7 days') AS week_count
 FROM events e
 JOIN exercises x ON x.exercise_id = e.exercise_id
 WHERE e.user_id = $1 AND x.movement_pattern = $2 AND x.recovery_class = $3;
+-- $4 is the request's `now`, not the database's now()
 ```
 
-- **Pain risk** ([5.5](./07-result-processing.md#55-pain-risk)): `SELECT actual FROM events WHERE user_id = $1 AND exercise_id = ANY($2) ORDER BY completed_at DESC LIMIT 1` — check `maxPain`/early-stop on the single most recent row for the exercise or its computed regressions (11.7).
-- **Daily progress** ([5.7](./07-result-processing.md#57-daily-progress)): `SUM` of stimulus, same shape as 11.5's `stimulus` CTE, filtered to `(completed_at AT TIME ZONE e.timezone)::date = (now() AT TIME ZONE $2)::date` — each event's *own* stored `timezone` places it on a day, compared against the timezone supplied with the current request ($2).
+- **Pain risk** ([5.5](./07-result-processing.md#55-pain-risk)): `SELECT actual FROM events WHERE user_id = $1 AND exercise_id = ANY($2) ORDER BY completed_at DESC LIMIT 1` — check `maxPain`/early-stop on the single most recent row for the exercise or its computed regressions (11.7). No `now` needed — it's a pure ordering query.
+- **Daily progress** ([5.7](./07-result-processing.md#57-daily-progress)): `SUM` of stimulus, same shape as 11.5's `stimulus` CTE, filtered to `(completed_at AT TIME ZONE e.timezone)::date = ($3::timestamptz AT TIME ZONE $2)::date` — each event's *own* stored `timezone` places it on a day, compared against the timezone ($2) and `now` ($3) supplied with the current request.
 - **Variation history** ([5.6](./07-result-processing.md#56-variation-history)): plain `SELECT ... ORDER BY completed_at DESC LIMIT n`, no aggregation at all.
 
 ## 11.9 Multi-User & Indexing

@@ -4,6 +4,8 @@
 
 `POST /result` does exactly one thing: **append the event to history** ([5.1](#51-store-event)). Nothing else is written. Capability score, fatigue, warmth, pain-risk flags, variation history, and daily progress are never separately updated or mutated — they're pure derivations from the event log ([2.9](./04-history-and-readiness.md#29-user-activity-history)), recomputed fresh whenever they're needed (typically the next `GET /next` call, via [Step 2](./06-decision-pipeline.md#step-2--compute-derived-state)). This section defines those derivation formulas.
 
+Every `now` below is the same single value supplied with the request that's doing the computing ([3.1](./05-server-api.md#31-get-next-action), [3.4](./05-server-api.md#34-submit-readiness)) — not an independent clock read inside each formula. See the [Core Principle](./01-purpose-and-principles.md#9-core-principle) note on why "now" is always an explicit input.
+
 ## 5.1 Store Event
 
 Append the event to user history ([2.9](./04-history-and-readiness.md#29-user-activity-history)), exactly as submitted. This is the only write in the entire system.

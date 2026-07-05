@@ -5,12 +5,14 @@
 ## 3.1 Get Next Action
 
 ```
-GET /api/users/{userId}/next?timezone=America/Los_Angeles
+GET /api/users/{userId}/next?timezone=America/Los_Angeles&now=2026-07-04T09:00:00-07:00
 ```
 
 `timezone` is required — there's no stored user-level timezone (2.1) to fall back on. The engine needs the athlete's *current* local timezone to compute "today" for daily stimulus ([Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today)) and recovery-class daily counts ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)), and the client is the only party that reliably knows it right now.
 
-A `recommendationId` is generated whenever a new `nextAction` (exercise **or** rest) is produced. Calling `GET /next` again before that recommendation is resolved returns the identical pinned recommendation (same `recommendationId`) rather than recomputing — this prevents the action changing out from under the user mid-session. A pending recommendation that's never resolved expires and is recomputed fresh after 4 hours.
+`now` is **optional** — an ISO8601 instant. If omitted, the server substitutes its own real clock. If supplied, that value is what "now" means for every derivation this call touches (fatigue decay, warmth decay, daily stimulus, recovery windows, repetition recency, recommendation expiry) — see the [Core Principle](./01-purpose-and-principles.md#9-core-principle) note on why time is threaded through explicitly rather than read ambiently. A real client just always passes the actual current time; this parameter mainly exists so a test can simulate "3 days later" without waiting or faking the system clock.
+
+A `recommendationId` is generated whenever a new `nextAction` (exercise **or** rest) is produced. Calling `GET /next` again before that recommendation is resolved returns the identical pinned recommendation (same `recommendationId`) rather than recomputing — this prevents the action changing out from under the user mid-session. A pending recommendation that's never resolved expires and is recomputed fresh after 4 hours, checked against the same `now`.
 
 Rest is not a special case in this lifecycle: it gets a `recommendationId` like any other action and is resolved via `POST /result` (a lightweight acknowledgment), which logs a `rest` event in history exactly like an exercise result does.
 
@@ -203,6 +205,43 @@ No eligibility or safety check applies to logging itself — this endpoint is a 
 Logging here has no effect on any currently pending recommendation from `GET /next` ([3.1](#31-get-next-action)) — it's untouched, and still resolves normally via `POST /result` or expires after its usual 4-hour timeout.
 
 There's no hard limit on how far back `occurredAt` can go, but only the last few days matter for fatigue/warmth — both fully decay well within a couple of weeks ([5.2](./07-result-processing.md#52-warmth), [5.3](./07-result-processing.md#53-fatigue)) regardless of what's backfilled. Older entries still help by giving the capability score replay ([5.4](./07-result-processing.md#54-capability-score-growth)) a more accurate starting point than assuming zero prior training.
+
+## 3.4 Submit Readiness
+
+```
+POST /api/users/{userId}/readiness
+```
+
+Body:
+
+```json
+{
+  "now": "2026-07-04T07:30:00-07:00",
+  "timezone": "America/Los_Angeles",
+  "painNow": 1,
+  "morningStiffness": "none",
+  "swelling": false,
+  "stairs": "easy",
+  "sleepQuality": "good"
+}
+```
+
+`painNow`/`morningStiffness`/`swelling`/`stairs`/`sleepQuality` are defined in [2.10](./04-history-and-readiness.md#210-readiness-state).
+
+Like [3.1](#31-get-next-action), `now` is optional (defaults to the server's real clock) and exists for the same reason: simulating a specific moment in tests. Unlike `GET /next`, here `now` also determines *which day's entry this is* — `date` (2.10) is derived as `now` converted into the given `timezone`'s calendar date, not submitted directly. Computing it this way rather than accepting a raw date string keeps it consistent with every other day-boundary calculation in the system (Step 4, 2.8, 5.7), all of which derive "today" from `(now, timezone)` the same way.
+
+`computedStatus` (2.10) is derived and stored at submission time from the fields above **and** `aggregateFatigue` ([2.10](./04-history-and-readiness.md#210-readiness-state)) computed as of this same `now`.
+
+Returns:
+
+```json
+{
+  "date": "2026-07-04",
+  "computedStatus": "green"
+}
+```
+
+Submitting again for the same derived `date` overwrites the previous entry for that day (upsert on `(userId, date)`) — useful if something changes later in the day (pain worsens, a nap improves things) and the user wants to update it.
 
 ---
 
