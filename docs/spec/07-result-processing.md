@@ -10,13 +10,14 @@ Append the event to user history ([2.9](./04-history-and-readiness.md#29-user-ac
 
 ## 5.2 Warmth
 
-Warmth is a decayed sum over recent events, not a stored-and-mutated counter:
+Warmth is a decayed sum over recent events, not a stored-and-mutated counter — computed twice, with different filters, per [2.11](./04-history-and-readiness.md#211-warmth-state):
 
 ```
-warmth_now = Σ over recent events e [ warmthEffect(e) × 0.5 ^ (minutesElapsed(e, now) / 20) ]
+generalWarmth_now         = Σ over recent events e            [ warmthEffect(e) × doseRatio(e) × 0.5 ^ (minutesElapsed(e, now) / 20) ]
+patternWarmth_now[p]      = Σ over recent events e where e.movementPattern = p [ warmthEffect(e) × doseRatio(e) × 0.5 ^ (minutesElapsed(e, now) / 20) ]
 ```
 
-`warmthEffect(e)` is the flat value from the exercise's warmth-effect table (see [2.11](./04-history-and-readiness.md#211-warmth-state)), scaled by dose ratio the same way stimulus is. The half-life is **20 minutes** — short, because warmth reflects being physically warmed up in the current session, not a lasting training effect. In practice only events from the last hour or so contribute meaningfully; anything older has decayed to near zero.
+`warmthEffect(e)` is the exercise's own flat scalar field (2.6). The half-life is **20 minutes** for both — short, because warmth reflects being physically warmed up in the current session, not a lasting training effect. In practice only events from the last hour or so contribute meaningfully; anything older has decayed to near zero.
 
 ## 5.3 Fatigue
 
@@ -62,9 +63,9 @@ Example (one step of the fold):
 An event is skipped in the fold (contributes 0 to `scoreIncrement`, though it still counts toward that day's stimulus total, [5.7](#57-daily-progress)) if:
 
 - pain exceeded `painLimit`
-- form was poor
+- `difficulty` ([2.9](./04-history-and-readiness.md#29-user-activity-history)) was `"too_hard"`
 - user stopped early due to discomfort
-- RPE was far above target
+- `rpe` ≥ `targetRpe` + 3
 
 ## 5.5 Pain Risk
 

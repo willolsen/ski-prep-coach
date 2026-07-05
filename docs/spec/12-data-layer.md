@@ -33,7 +33,7 @@ Seeded from the JSON already defined in Section 2 — these are config data, not
 CREATE TABLE users (
   user_id       text PRIMARY KEY,
   display_name  text NOT NULL,
-  profile       jsonb NOT NULL   -- availableEquipment, constraints, preferences (2.1)
+  profile       jsonb NOT NULL   -- availableEquipment, movementPatternRestrictions, preferences (2.1)
 );
 
 CREATE TABLE capabilities (
@@ -53,19 +53,26 @@ CREATE TABLE recovery_classes (
 );
 
 CREATE TABLE exercises (
-  exercise_id          text PRIMARY KEY,   -- free-exercise-db id or custom id (2.6)
-  base_source          text NOT NULL,      -- 'free-exercise-db' | 'custom'
-  movement_pattern     text NOT NULL,      -- one of the 7 ids (2.5)
-  recovery_class       text NOT NULL REFERENCES recovery_classes(recovery_class),
-  risk_level           text NOT NULL,
-  requires_warmth      text NOT NULL,
-  snack_safe_when_cold boolean NOT NULL,
-  fatigue_cost         numeric NOT NULL,   -- single scalar, per its own recovery bucket (2.6)
-  warmth_effect        numeric NOT NULL,   -- flat contribution per full-dose completion (2.11)
-  capability_effects   jsonb NOT NULL,     -- per-capability stimulus map, e.g. {"posterior_chain": 8} (2.6)
-  metadata             jsonb NOT NULL      -- name, instructions, safetyNotes, substitutes, regressions, progressions, free-exercise-db base fields, etc.
+  exercise_id                      text PRIMARY KEY,   -- free-exercise-db id or custom id (2.6)
+  base_source                      text NOT NULL,      -- 'free-exercise-db' | 'custom'
+  movement_pattern                 text NOT NULL,      -- one of the 7 ids (2.5)
+  family_id                        text NOT NULL,      -- groups substitutable variants; a real column because Step 8 queries by it directly
+  progression_level                numeric NOT NULL,   -- comparable only within the same family_id (or movement_pattern as fallback)
+  recovery_class                   text NOT NULL REFERENCES recovery_classes(recovery_class),
+  risk_level                       text NOT NULL,
+  general_warmth_required          numeric NOT NULL,
+  movement_pattern_warmth_required numeric NOT NULL,
+  fatigue_cost                     numeric NOT NULL,   -- single scalar, per its own recovery bucket (2.6)
+  warmth_effect                    numeric NOT NULL,   -- flat contribution per full-dose completion (2.11)
+  capability_effects               jsonb NOT NULL,     -- per-capability stimulus map, e.g. {"posterior_chain": 8} (2.6)
+  metadata                         jsonb NOT NULL      -- name, instructions, safetyNotes, free-exercise-db base fields, etc.
 );
+
+CREATE INDEX exercises_family_idx ON exercises (family_id, progression_level);
+CREATE INDEX exercises_pattern_idx ON exercises (movement_pattern, progression_level);
 ```
+
+`family_id` and `progression_level` are real, indexed columns rather than `metadata` fields — unlike everything else in `metadata`, [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)'s substitute/regression/progression logic (11.7) queries by them directly, so they need to be indexable, not buried in JSON.
 
 `target` is a generated column, not a separately maintained value — it can never drift from `priority` because Postgres recomputes it, the same reasoning as everything else in this spec that's derived rather than stored.
 
@@ -152,7 +159,7 @@ FROM fold
 ORDER BY capability_id, completed_at DESC;
 ```
 
-The pattern: each recursive step joins forward to exactly the *next* chronological event for that capability, carrying `running_score` as an accumulator — the same "row-at-a-time recurrence relation" idiom used for running totals that aren't simple sums. `trend` (2.4) reruns this same query with an added `completed_at <= now() - interval '14 days'` filter and compares.
+The pattern: each recursive step joins forward to exactly the *next* chronological event for that capability, carrying `running_score` as an accumulator — the same "row-at-a-time recurrence relation" idiom used for running totals that aren't simple sums.
 
 This will get refined once it's real code (indexing, ties, capabilities with zero events), but the shape is the reason PostgreSQL won the comparison — this exact computation is awkward in application code and awkward in engines without recursive queries, and natural here.
 
@@ -173,19 +180,52 @@ JOIN recovery_classes rc ON rc.recovery_class = x.recovery_class
 WHERE e.user_id = $1 AND e.type = 'exercise_result'
 GROUP BY x.movement_pattern, x.recovery_class;
 
--- Warmth (20-minute half-life; anything older than ~3 hours is negligible, so the window filter is just an optimization)
+-- aggregateFatigue (2.10, Step 3): just MAX() over the query above, computed the same way
+
+-- General warmth (20-minute half-life; anything older than ~3 hours is negligible, so the window filter is just an optimization)
 SELECT SUM(
   e.dose_ratio * x.warmth_effect *
   POWER(0.5, EXTRACT(EPOCH FROM (now() - e.completed_at)) / 60.0 / 20.0)
-) AS warmth_score
+) AS general_warmth
 FROM events e
 JOIN exercises x ON x.exercise_id = e.exercise_id
 WHERE e.user_id = $1 AND e.completed_at > now() - interval '3 hours';
+
+-- Per-movement-pattern warmth: same query, grouped by pattern instead of summed across all of them
+SELECT
+  x.movement_pattern,
+  SUM(e.dose_ratio * x.warmth_effect *
+      POWER(0.5, EXTRACT(EPOCH FROM (now() - e.completed_at)) / 60.0 / 20.0)
+  ) AS pattern_warmth
+FROM events e
+JOIN exercises x ON x.exercise_id = e.exercise_id
+WHERE e.user_id = $1 AND e.completed_at > now() - interval '3 hours'
+GROUP BY x.movement_pattern;
 ```
 
-## 11.7 The Rest: Recovery Eligibility, Pain Risk, Daily Progress
+## 11.7 Substitutes, Regressions, and Progressions
 
-Simpler variations of the same two patterns — grouped counts/timestamps, or a most-recent-row lookup:
+Since exercises don't reference each other (2.6), these are computed from `family_id`, `movement_pattern`, and `progression_level` rather than looked up from a stored list ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)):
+
+```sql
+-- Substitutes for exercise $1: same family first, same movement pattern as a fallback if the family has no other eligible members
+SELECT * FROM exercises
+WHERE exercise_id != $1
+  AND (
+    family_id = (SELECT family_id FROM exercises WHERE exercise_id = $1)
+    OR movement_pattern = (SELECT movement_pattern FROM exercises WHERE exercise_id = $1)
+  )
+ORDER BY (family_id = (SELECT family_id FROM exercises WHERE exercise_id = $1)) DESC, progression_level;
+
+-- Regression: from that same set, the nearest progression_level below $1's own
+-- Progression: the nearest progression_level above
+```
+
+The `ORDER BY` puts same-family rows first (matches `true` sorting after `false` when descending), so the caller can just take the first same-family regression/progression it finds and only fall back to same-pattern-only rows if none exist.
+
+## 11.8 The Rest: Recovery Eligibility, Pain Risk, Daily Progress
+
+Simpler variations of the same patterns — grouped counts/timestamps, or a most-recent-row lookup:
 
 ```sql
 -- Recovery-class hard eligibility gate for a given bucket (Step 6)
@@ -198,17 +238,17 @@ JOIN exercises x ON x.exercise_id = e.exercise_id
 WHERE e.user_id = $1 AND x.movement_pattern = $2 AND x.recovery_class = $3;
 ```
 
-- **Pain risk** ([5.5](./07-result-processing.md#55-pain-risk)): `SELECT actual FROM events WHERE user_id = $1 AND exercise_id = ANY($2) ORDER BY completed_at DESC LIMIT 1` — check `maxPain`/early-stop on the single most recent row for the exercise or its regressions.
+- **Pain risk** ([5.5](./07-result-processing.md#55-pain-risk)): `SELECT actual FROM events WHERE user_id = $1 AND exercise_id = ANY($2) ORDER BY completed_at DESC LIMIT 1` — check `maxPain`/early-stop on the single most recent row for the exercise or its computed regressions (11.7).
 - **Daily progress** ([5.7](./07-result-processing.md#57-daily-progress)): `SUM` of stimulus, same shape as 11.5's `stimulus` CTE, filtered to `(completed_at AT TIME ZONE e.timezone)::date = (now() AT TIME ZONE $2)::date` — each event's *own* stored `timezone` places it on a day, compared against the timezone supplied with the current request ($2).
 - **Variation history** ([5.6](./07-result-processing.md#56-variation-history)): plain `SELECT ... ORDER BY completed_at DESC LIMIT n`, no aggregation at all.
 
-## 11.8 Multi-User & Indexing
+## 11.9 Multi-User & Indexing
 
 Every table with behavioral data leads with `user_id`, and every index leads with it too — in practice every query in this system is scoped to "this user's data," so `user_id` is always the first predicate. `users` is the tenancy root; nothing else has meaning without it. This was already implicit throughout Section 2 (every object already carries a `userId`) — the schema just makes it a real foreign key and an indexed column instead of a JSON field.
 
 Postgres row-level security (RLS) is a natural future hardening step — a policy like `USING (user_id = current_setting('app.current_user_id'))` on `events` would make cross-user leakage a database-enforced invariant rather than something every query has to get right. Not needed for MVP (a single query filter is enough at this stage), but worth knowing it's there if the app grows beyond a single trusted client.
 
-## 11.9 Migrations & Configuration
+## 11.10 Migrations & Configuration
 
 A single `DATABASE_URL` environment variable selects the target — local Docker, RDS, or Azure Database for PostgreSQL — with no code branching between environments. Schema migrations and the reference-data seed (capabilities, recovery classes, movement patterns) are implementation work for when the server project actually starts, not fixed here.
 

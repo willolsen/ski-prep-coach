@@ -43,19 +43,19 @@ Built on top of the [free-exercise-db](https://github.com/yuhonas/free-exercise-
 | `baseSource` | `"free-exercise-db"` or `"custom"` — provenance. `"custom"` is for exercises authored specifically for SkiPrepCoach with no free-exercise-db equivalent (most of the MVP set in [Section 7](./09-mvp-exercises.md)) |
 | `icon` | display emoji |
 | `movementPattern` | one of the 7 ids in [2.5](#25-movement-patterns) — free-exercise-db has no equivalent concept |
-| `familyId` | groups variants for [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules) variation logic |
+| `familyId` | groups variants for [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)'s computed substitute/regression/progression logic |
+| `progressionLevel` | a number placing this exercise on a difficulty scale, comparable only against other exercises sharing its `familyId` (or, failing that, its `movementPattern`) — see [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules) |
 | `variantTags` | free-form tags used in scoring/variation |
 | `safetyNotes` | shown to the user; distinct from `instructions` |
-| `requiresWarmth` | minimum warmth state ([2.11](./04-history-and-readiness.md#211-warmth-state)) required |
+| `generalWarmthRequired` | minimum general (whole-body) warmth needed ([5.2](./07-result-processing.md#52-warmth); see [2.11](./04-history-and-readiness.md#211-warmth-state)) |
+| `movementPatternWarmthRequired` | minimum warmth needed specifically in this exercise's own `movementPattern` bucket ([5.2](./07-result-processing.md#52-warmth)) |
 | `riskLevel` | baseline risk penalty input ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)) |
 | `recoveryClass` | [2.8](#28-recovery-classes) |
-| `snackSafeWhenCold` | whether this can be done without a warm-up |
 | `capabilityEffects` | per-capability stimulus value ([5.4](./07-result-processing.md#54-capability-score-growth)) |
 | `fatigueCost` | single scalar — fatigue contributed to this exercise's `(movementPattern, recoveryClass)` bucket per full-dose completion ([5.3](./07-result-processing.md#53-fatigue)). Not per-capability: fatigue is tracked only at the bucket level (2.8), so there's nothing to break down by capability |
 | `warmthEffect` | single scalar — warmth contributed per full-dose completion ([5.2](./07-result-processing.md#52-warmth); see [2.11](./04-history-and-readiness.md#211-warmth-state)) |
-| `substitutes` | alternate exercises for the same slot |
-| `regressions` | easier variants ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) |
-| `progressions` | harder variants ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) |
+
+There is deliberately no `substitutes`, `regressions`, or `progressions` field — **exercises do not reference each other.** An earlier version of this schema stored those as explicit arrays of exercise ids, which meant every new exercise required manually updating other exercises' arrays to point back at it, and kept the same information twice (once in the array, once implicitly in `familyId`/`movementPattern`). Now `familyId` plus `progressionLevel` are the only two pieces of data needed; which exercises count as substitutes, regressions, or progressions for a given exercise is computed at query time ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules), [Section 11](./12-data-layer.md)), not stored anywhere.
 
 Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Romanian_Deadlift.json), base fields exactly as published, extended with SkiPrepCoach fields:
 
@@ -83,39 +83,28 @@ Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/bl
   "icon": "🏋",
   "movementPattern": "hinge",
   "familyId": "hip_hinge",
+  "progressionLevel": 5,
   "variantTags": ["barbell", "bilateral", "posterior_chain", "strength"],
   "safetyNotes": [
     "Do not round the lower back.",
     "Do not perform cold.",
     "Stop if back pain or sharp knee pain occurs."
   ],
-  "requiresWarmth": "warm",
+  "generalWarmthRequired": 30,
+  "movementPatternWarmthRequired": 40,
   "riskLevel": "moderate",
   "recoveryClass": "heavy_strength",
-  "snackSafeWhenCold": false,
   "capabilityEffects": {
     "posterior_chain": 8,
     "lower_body_strength": 5,
     "fall_resilience": 2
   },
   "fatigueCost": 20,
-  "warmthEffect": 25,
-  "substitutes": [
-    "Stiff-Legged_Dumbbell_Deadlift",
-    "kettlebell_deadlift",
-    "hip_hinge_dowel"
-  ],
-  "regressions": [
-    "hip_hinge_dowel",
-    "romanian_deadlift_light"
-  ],
-  "progressions": [
-    "Kettlebell_One-Legged_Deadlift"
-  ]
+  "warmthEffect": 25
 }
 ```
 
-`Stiff-Legged_Dumbbell_Deadlift` and `Kettlebell_One-Legged_Deadlift` are real free-exercise-db entries. `kettlebell_deadlift` (plain bilateral), `hip_hinge_dowel`, and `romanian_deadlift_light` are `baseSource: "custom"` — dose variants and coaching-cue drills that don't exist as distinct database entries.
+`Stiff-Legged_Dumbbell_Deadlift`, `Kettlebell_One-Legged_Deadlift`, and other same-family exercises are no longer listed on this exercise at all — they're found by querying for `familyId: "hip_hinge"` when needed (see [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)), each with its own `progressionLevel` to rank them.
 
 `capabilityEffects` is also the basis for stimulus and capability growth ([5.4](./07-result-processing.md#54-capability-score-growth)), and `fatigueCost` is also the basis for the fatigue penalty in scoring ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)).
 

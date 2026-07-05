@@ -43,7 +43,7 @@ Immediately return rest/recovery if:
 - limp or instability reported
 - severe next-morning pain response
 - red readiness state
-- unsafe fatigue accumulation
+- unsafe fatigue accumulation (`aggregateFatigue` ≥ 100 — see [2.10](./04-history-and-readiness.md#210-readiness-state))
 
 Safety has veto power over all performance goals.
 
@@ -89,7 +89,7 @@ Rank capabilities by:
 limitingRank = (target[c] − score[c]) × (priority[c] / 10)
 ```
 
-adjusted upward if undertrained recently (no stimulus earned in the last 3 days) or `trend` is declining. The top-ranked capabilities (typically top 2–3) are flagged as **limiting** and receive the 1.5× scoring boost in [Step 7](#step-7--score-candidate-actions).
+adjusted upward if undertrained recently (no stimulus earned in the last 3 days). The top-ranked capabilities (typically top 2–3) are flagged as **limiting** and receive the 1.5× scoring boost in [Step 7](#step-7--score-candidate-actions).
 
 Example:
 
@@ -119,14 +119,14 @@ Generate candidates from the exercise library.
 An exercise is initially eligible if:
 
 - user has equipment (for MVP, all equipment in `availableEquipment` — [2.1](./02-capabilities.md#21-user-profile) — is assumed accessible at all times; there is no per-call context for current location. This can be added later as an optional `GET /next` parameter if it turns out to matter in practice)
-- not medically constrained
-- current level allows it
-- readiness allows it
-- warmth allows it
+- its `movementPattern` is not restricted to `"avoid"` in `movementPatternRestrictions` ([2.1](./02-capabilities.md#21-user-profile)); if restricted to `"mild"`, only eligible when its `recoveryClass` is `daily` or `light`
+- readiness allows it (not excluded by the current red/yellow readiness state, [2.10](./04-history-and-readiness.md#210-readiness-state))
+- general warmth ≥ its `generalWarmthRequired`, and its own movement pattern's warmth ≥ its `movementPatternWarmthRequired` ([2.6](./03-exercises-and-recovery.md#26-exercise-definition), [2.11](./04-history-and-readiness.md#211-warmth-state))
 - its `(movementPattern, recoveryClass)` bucket is eligible ([2.8](./03-exercises-and-recovery.md#28-recovery-classes))
 - target capability is useful
-- fatigue cost is acceptable
-- not currently flagged `elevatedRisk` without an eligible regression available ([5.5](./07-result-processing.md#55-pain-risk))
+- not currently flagged `elevatedRisk` without an eligible computed regression available ([5.5](./07-result-processing.md#55-pain-risk), [Step 8](#step-8--apply-variation-rules))
+
+There is deliberately no "current level allows it" criterion — an earlier version referenced the exercise's free-exercise-db `level` (beginner/intermediate/expert), but nothing in this spec defines a comparable user-side level to check it against. `level` is carried through as informational metadata only; `progressionLevel` (2.6) is the field that actually drives progression/regression ([Step 8](#step-8--apply-variation-rules)). There is likewise no separate "fatigue cost is acceptable" gate — fatigue is already a soft signal in [Step 7](#step-7--score-candidate-actions)'s scoring, and a second, undefined hard threshold here would just double-gate the same thing.
 
 Example blocked exercise:
 
@@ -169,7 +169,13 @@ Example:
 
 ## Step 8 — Apply Variation Rules
 
-The engine should prefer useful variation, not random variation.
+The engine should prefer useful variation, not random variation. **Exercises do not reference each other** ([2.6](./03-exercises-and-recovery.md#26-exercise-definition)) — "substitutes," "regressions," and "progressions" are not stored lists, they're computed at query time from `familyId`, `movementPattern`, and `progressionLevel`:
+
+- **Substitutes** — other exercises sharing this exercise's `familyId`. If none are eligible, broaden to any exercise sharing just its `movementPattern`.
+- **Regressions** — from that same substitute set, the exercise(s) with the next `progressionLevel` *below* this one.
+- **Progressions** — from that same substitute set, the exercise(s) with the next `progressionLevel` *above* this one.
+
+`progressionLevel` is only ever compared within a substitute set (same `familyId`, or same `movementPattern` as a fallback) — it's not a global difficulty scale across unrelated exercises. See [Section 11](./12-data-layer.md) for the query.
 
 Hierarchy:
 
@@ -180,19 +186,21 @@ Capability → Movement Pattern → Exercise Family → Variant
 Rules:
 
 - Do not repeat the same exercise too often if safe substitutes exist (already penalized via `repetitionPenalty` in [Step 7](#step-7--score-candidate-actions)).
-- Do not vary so much that progression becomes unmeasurable.
-- Prefer variants in the same movement family when the same training effect is desired.
-- Use regressions if readiness or warmth is low, or if the exercise is flagged `elevatedRisk` ([5.5](./07-result-processing.md#55-pain-risk)).
-- Use progressions only when recent results justify it.
+- Do not vary so much that progression becomes unmeasurable — prefer the same `familyId` over a same-`movementPattern`-only substitute when both are eligible.
+- Use a computed regression if readiness or warmth is low, or if the exercise is flagged `elevatedRisk` ([5.5](./07-result-processing.md#55-pain-risk)).
+- Use a computed progression only when recent results justify it.
 
 Example:
 
 ```json
 {
-  "movementPattern": "hinge",
+  "exerciseId": "Romanian_Deadlift",
+  "familyId": "hip_hinge",
+  "progressionLevel": 5,
   "recentVariants": ["Romanian_Deadlift"],
   "suggestedVariant": "Stiff-Legged_Dumbbell_Deadlift",
-  "reason": "same pattern, less repetition, appropriate load"
+  "suggestedVariantProgressionLevel": 4,
+  "reason": "same family, lower repetition, appropriate load"
 }
 ```
 

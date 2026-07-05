@@ -126,6 +126,15 @@ Body:
 
 `timezone` is the client's current timezone at submission time, stored on the event itself (2.9) rather than looked up from a profile — see [2.9](./04-history-and-readiness.md#29-user-activity-history) for why it's captured per-event instead of per-user.
 
+Returns:
+
+```json
+{
+  "status": "ok",
+  "eventId": "evt-001"
+}
+```
+
 Server responsibility: **store the event** ([5.1](./07-result-processing.md#51-store-event)). That's the entire write. Warmth, fatigue, capability score, recovery eligibility, and daily progress are all derived from the event log on the next `GET /next` call ([Section 5](./07-result-processing.md)) — there's nothing else to update.
 
 `actual.notes` is free text and is stored verbatim. Nothing in the engine reads it today — see [2.9](./04-history-and-readiness.md#29-user-activity-history) for why it's captured anyway.
@@ -177,6 +186,15 @@ Body (batch, as onboarding typically needs; a self-directed log is usually just 
 ```
 
 Each entry is stored as an ordinary `exercise_result` event ([2.9](./04-history-and-readiness.md#29-user-activity-history)) with `startedAt`/`completedAt` set from `occurredAt`. No `recommendationId` is needed or expected — unlike [3.2](#32-submit-result), these entries were never preceded by a `GET /next` call. Entries don't need a `prescribed` block either, since there was no prescription to compare against; dose ratio ([5.4](./07-result-processing.md#54-capability-score-growth)) falls back to 1.0.
+
+Returns:
+
+```json
+{
+  "status": "ok",
+  "eventIds": ["evt-003", "evt-004"]
+}
+```
 
 `timezone` is per-entry rather than one value for the whole batch, since an onboarding backfill can span weeks and, in principle, a trip through a different timezone — each entry's day-boundary calculations use whatever timezone was actually in effect for that entry.
 

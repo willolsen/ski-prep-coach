@@ -21,10 +21,8 @@ Stores stable user-level information.
     "pickleball_court",
     "hiking_trails"
   ],
-  "constraints": {
-    "kneeSensitivity": true,
-    "lowBackCaution": true,
-    "avoidBulking": true
+  "movementPatternRestrictions": {
+    "squat": "mild"
   },
   "preferences": {
     "likes": ["rollerblading", "hiking", "pickleball"],
@@ -35,6 +33,8 @@ Stores stable user-level information.
 ```
 
 Used by `next` logic to filter exercises, prioritize goals, and bias recommendations toward enjoyable options.
+
+`movementPatternRestrictions` maps a subset of the 7 movement patterns ([2.5](./03-exercises-and-recovery.md#25-movement-patterns)) to a restriction level: `"mild"` (only low-intensity exercises of that pattern are eligible) or `"avoid"` (that pattern is excluded from candidates entirely). Patterns not listed have no restriction. This replaces an earlier, more specific `constraints` design (knee sensitivity, low back caution, etc.) — rather than modeling each individual sensitivity and mapping it to affected exercises, the engine only needs to know which movement patterns the user should approach cautiously or not at all, and lets [Step 6](./06-decision-pipeline.md#step-6--generate-candidate-actions) apply that directly. See [Step 6](./06-decision-pipeline.md#step-6--generate-candidate-actions) for exactly how `"mild"` and `"avoid"` affect eligibility.
 
 There is deliberately no `primaryGoal` field — that information is already implied by which capabilities (2.2) exist and how they're prioritized, so a separate goal label would just be redundant with data the engine already has. There is likewise deliberately no `targetDate` or deadline field — the engine has no concept of time remaining toward a goal.
 
@@ -123,9 +123,9 @@ Capability scores ([2.4](#24-capability-state-derived)) are on a 0–100 scale, 
 
 **`score[c]`** — replay every historical `exercise_result` event that trains capability `c`, in chronological order, applying the growth formula from [5.4](./07-result-processing.md#54-capability-score-growth) one event at a time, starting from 0. The result is exactly the same diminishing-returns curve described there; it's just computed by folding over history rather than incrementally mutating a stored number.
 
-**`trend`** — compare `score[c]` as of now against `score[c]` as of ~14 days ago (both computed via the same replay, just truncating history at different cutoff times). Improving if meaningfully higher, declining if meaningfully lower, stable otherwise.
-
 **`lastTrainedAt`** — the `completedAt` of the most recent historical event that trained capability `c`.
+
+There is deliberately no `trend` field for MVP. An earlier version compared `score[c]` now against `score[c]` ~14 days ago, but "meaningfully higher/lower" had no defined threshold, and computing it meant running the replay twice per capability for a ranking nudge that was hard to justify without real usage data to calibrate against. Cut for now; revisit once there's history to tune it with.
 
 Example — what a `GET` of this computed view returns (not what's stored):
 
@@ -135,17 +135,14 @@ Example — what a `GET` of this computed view returns (not what's stored):
   "capabilities": {
     "knee_capacity": {
       "score": 22,
-      "trend": "improving",
       "lastTrainedAt": "2026-07-04T09:20:00-07:00"
     },
     "lower_body_strength": {
       "score": 18,
-      "trend": "stable",
       "lastTrainedAt": "2026-07-03T16:00:00-07:00"
     },
     "balance": {
       "score": 28,
-      "trend": "improving",
       "lastTrainedAt": "2026-07-04T11:30:00-07:00"
     }
   }
