@@ -12,7 +12,6 @@ The client is thin. It displays the recommended action, collects the result, and
 
 The engine optimizes for safe, steady progress toward skiing capability by using:
 
-- user goals
 - exercise metadata
 - recovery rules
 - capability targets
