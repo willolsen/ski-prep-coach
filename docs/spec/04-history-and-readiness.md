@@ -38,7 +38,9 @@ Every completed or attempted action is stored as an event — including acknowle
 }
 ```
 
-`source` is `"live"` for events logged through the normal `GET /next` → `POST /result` loop, or `"onboarding"` for events backfilled through the [onboarding endpoint](./05-server-api.md#33-onboarding) (3.3) before the user's first real session. Both are ordinary events and count identically in every derivation — `source` exists only for auditability (e.g. "show me what I entered during onboarding vs. logged live").
+`source` is `"live"` for events logged through the normal `GET /next` → `POST /result` loop, or one of `"onboarding"` / `"self_directed"` for events inserted directly through [3.3](./05-server-api.md#33-logging-without-a-recommendation) (backfilled pre-first-use history, or an exercise the user did that wasn't the recommended action). All three are ordinary events and count identically in every derivation — `source` exists only for auditability (e.g. "show me what I logged myself vs. what the app recommended").
+
+**`actual.notes`** is free text, always available on any event regardless of `source`, and stored verbatim. No derivation formula in this spec reads it — it exists purely so the user's own commentary ("knee felt a little off on the last rep," "did this outside instead of at the gym") isn't lost. Since it's just another field on a stored event, it's already retrievable by reading history; a dedicated "read your notes" view can be added later with zero data-model changes.
 
 Used to derive capability score, fatigue, warmth, pain risk, variation history, and daily progress ([Section 5](./07-result-processing.md)).
 

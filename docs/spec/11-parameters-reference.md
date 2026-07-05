@@ -26,7 +26,8 @@ Quick lookup for every constant/formula decided during spec review, so implement
 | Readiness inputs | manual entry only for MVP; no biometric/wearable integration ([2.10](./04-history-and-readiness.md#210-readiness-state)) |
 | Day boundary | user profile `timezone` field; resets at local midnight ([2.1](./02-capabilities.md#21-user-profile)) |
 | Rest actions | same recommendation lifecycle as exercises; logged as an event once acknowledged ([2.9](./04-history-and-readiness.md#29-user-activity-history), [3.1](./05-server-api.md#31-get-next-action)) |
-| Onboarding | dedicated endpoint backfills historical `exercise_result` events (`source: "onboarding"`) before first real use; same schema and full weight as live events, no `recommendationId` needed ([3.3](./05-server-api.md#33-onboarding)) |
+| Logging without a recommendation | one endpoint covers both onboarding (`source: "onboarding"`, backfilled pre-first-use history) and self-directed logging (`source: "self_directed"`, an exercise done that wasn't recommended); same schema and full weight as live events, no `recommendationId` needed ([3.3](./05-server-api.md#33-logging-without-a-recommendation)) |
+| Notes | `actual.notes` is free text on every event regardless of source; stored verbatim, read by no current derivation, kept for possible future use ([2.9](./04-history-and-readiness.md#29-user-activity-history)) |
 | Time-to-goal concept | **none** — no deadlines, countdowns, or seasons anywhere in the engine ([Core Principle](./01-purpose-and-principles.md#9-core-principle)) |
 
 ---

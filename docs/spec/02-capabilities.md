@@ -168,7 +168,7 @@ There is no per-capability `fatigue` field here — fatigue is tracked only once
 
 **Implementation note:** replaying full history on every request is fine at this scale (a single user's event log stays small enough to fold in milliseconds for years of daily use). An implementation may cache this computation for performance, but the cache is never authoritative — it must always match a full replay of 2.9 exactly, and can be invalidated or rebuilt from the event log alone at any time.
 
-This is also what makes onboarding simple (see [3.3](./05-server-api.md#33-onboarding)): backfilling a few weeks of historical exercises is just inserting ordinary events with backdated timestamps — there's no separate "initial state" to bootstrap.
+This is also what makes onboarding simple (see [3.3](./05-server-api.md#33-logging-without-a-recommendation)): backfilling a few weeks of historical exercises is just inserting ordinary events with backdated timestamps — there's no separate "initial state" to bootstrap.
 
 ---
 

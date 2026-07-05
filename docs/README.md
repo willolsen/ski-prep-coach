@@ -14,7 +14,7 @@ The spec is split into one file per part, so each can be read, edited, or review
 | 2.1–2.4 | [Data Model: User Profile & Capabilities](./spec/02-capabilities.md) | User profile, capability definitions, derived capability targets, capability state (computed from history, not stored) |
 | 2.5–2.8 | [Data Model: Exercises & Recovery](./spec/03-exercises-and-recovery.md) | Movement pattern taxonomy, exercise schema (built on [free-exercise-db](https://github.com/yuhonas/free-exercise-db)), prescriptions, recovery classes & fatigue decay |
 | 2.9–2.11 | [Data Model: History & Readiness](./spec/04-history-and-readiness.md) | Activity history events (the one thing that's actually stored), readiness state, warmth state |
-| 3 | [Server API](./spec/05-server-api.md) | `GET /next`, `POST /result`, and the onboarding endpoint for backfilling history before first use |
+| 3 | [Server API](./spec/05-server-api.md) | `GET /next`, `POST /result`, and logging without a recommendation (onboarding backfill and self-directed exercises) |
 | 4 | [Next Decision Pipeline](./spec/06-decision-pipeline.md) | The 10-step algorithm from loading state to building the explanation |
 | 5 | [Submitting a Result](./spec/07-result-processing.md) | The one real write (store the event) plus every derivation formula (warmth, fatigue, capability growth, pain risk, variation history, daily progress) |
 | 6 | [Daily Progress](./spec/08-daily-progress.md) | The "have we done enough today" view |
