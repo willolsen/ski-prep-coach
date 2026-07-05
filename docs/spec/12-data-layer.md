@@ -1,6 +1,6 @@
 # 11. Data Layer
 
-[← Index](../README.md) · Previous: [Resolved Parameters Reference](./11-parameters-reference.md)
+[← Index](../README.md) · Previous: [Resolved Parameters Reference](./11-parameters-reference.md) · Next: [Server Framework & Deployment →](./13-server-framework.md)
 
 This section maps the abstract data model (Section 2) and derivation formulas (Section 5) onto an actual PostgreSQL schema. It exists because the [Core Principle](./01-purpose-and-principles.md#9-core-principle) — derive everything from the event log instead of storing it — only holds up if the database can actually do that derivation efficiently. PostgreSQL was chosen specifically because its recursive CTEs and window functions can express the sequential, aggregate-heavy computations in Section 5 directly, rather than pulling every event into application code to fold over.
 
@@ -216,4 +216,4 @@ A single `DATABASE_URL` environment variable selects the target — local Docker
 
 ---
 
-[← Index](../README.md) · Previous: [Resolved Parameters Reference](./11-parameters-reference.md)
+[← Index](../README.md) · Previous: [Resolved Parameters Reference](./11-parameters-reference.md) · Next: [Server Framework & Deployment →](./13-server-framework.md)

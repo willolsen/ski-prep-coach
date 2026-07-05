@@ -30,6 +30,7 @@ Quick lookup for every constant/formula decided during spec review, so implement
 | Notes | `actual.notes` is free text on every event regardless of source; stored verbatim, read by no current derivation, kept for possible future use ([2.9](./04-history-and-readiness.md#29-user-activity-history)) |
 | Time-to-goal concept | **none** — no deadlines, countdowns, or seasons anywhere in the engine ([Core Principle](./01-purpose-and-principles.md#9-core-principle)) |
 | Database | PostgreSQL everywhere (local Docker, AWS RDS, Azure Database for PostgreSQL) — recursive CTEs handle the capability-score fold, `jsonb` handles the variable `prescribed`/`actual` shape ([Section 11](./12-data-layer.md)) |
+| Server framework | Hono, not Express — official adapters for Node (local/container) and AWS Lambda; one shared app module, a thin entry point per deployment target ([Section 12](./13-server-framework.md)) |
 
 ---
 

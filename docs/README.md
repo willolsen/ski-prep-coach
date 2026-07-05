@@ -1,4 +1,4 @@
-# SkiPrepCoach — Core Engine Specification v0.4
+# SkiPrepCoach — Core Engine Specification v0.5
 
 SkiPrepCoach is a server-side decision engine that answers one question: **what is the best next action for this user right now?** The client is thin — it displays the recommended action, collects the result, and sends it back. See [Purpose & Core Principle](./spec/01-purpose-and-principles.md) for the full framing.
 
@@ -22,6 +22,7 @@ The spec is split into one file per part, so each can be read, edited, or review
 | 8 | [MVP Development Order](./spec/10-mvp-development-order.md) | Build sequence |
 | 10 | [Resolved Parameters Reference](./spec/11-parameters-reference.md) | Every constant/formula decided during spec review, in one lookup table |
 | 11 | [Data Layer](./spec/12-data-layer.md) | PostgreSQL schema (tables, `jsonb` payloads, indexing), the recursive CTE for capability-score replay, and the decayed-sum queries for fatigue/warmth |
+| 12 | [Server Framework & Deployment](./spec/13-server-framework.md) | Why Hono over Express, the shared-app-plus-thin-entry-points shape, and how it runs locally, on AWS Lambda, and on Azure |
 
 ## Reading order
 
