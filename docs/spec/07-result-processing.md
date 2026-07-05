@@ -1,38 +1,50 @@
-# 5. Result Processing Logic
+# 5. Submitting a Result
 
 [← Index](../README.md) · Previous: [Decision Pipeline](./06-decision-pipeline.md) · Next: [Daily Progress →](./08-daily-progress.md)
 
-When a result is submitted:
+`POST /result` does exactly one thing: **append the event to history** ([5.1](#51-store-event)). Nothing else is written. Capability score, fatigue, warmth, pain-risk flags, variation history, and daily progress are never separately updated or mutated — they're pure derivations from the event log ([2.9](./04-history-and-readiness.md#29-user-activity-history)), recomputed fresh whenever they're needed (typically the next `GET /next` call, via [Step 2](./06-decision-pipeline.md#step-2--compute-derived-state)). This section defines those derivation formulas.
 
 ## 5.1 Store Event
 
-Append the event to user history.
+Append the event to user history ([2.9](./04-history-and-readiness.md#29-user-activity-history)), exactly as submitted. This is the only write in the entire system.
 
-## 5.2 Update Warmth
+## 5.2 Warmth
 
-Increase warmth based on completed work.
+Warmth is a decayed sum over recent events, not a stored-and-mutated counter:
 
-Then apply decay based on time.
+```
+warmth_now = Σ over recent events e [ warmthEffect(e) × 0.5 ^ (minutesElapsed(e, now) / 20) ]
+```
 
-## 5.3 Update Fatigue
+`warmthEffect(e)` is the flat value from the exercise's warmth-effect table (see [2.11](./04-history-and-readiness.md#211-warmth-state)), scaled by dose ratio the same way stimulus is. The half-life is **20 minutes** — short, because warmth reflects being physically warmed up in the current session, not a lasting training effect. In practice only events from the last hour or so contribute meaningfully; anything older has decayed to near zero.
 
-Add fatigue to the exercise's `(movementPattern, recoveryClass)` bucket(s) according to its `fatigueCost` and actual dose (see [2.8](./03-exercises-and-recovery.md#28-recovery-classes) for the decay formula).
+## 5.3 Fatigue
 
-## 5.4 Update Capability Scores
+Fatigue is scoped per `(movementPattern, recoveryClass)` bucket ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)), and is likewise a decayed sum over every historical event that falls into that bucket:
 
-For each capability the completed exercise trains, compute a dose ratio (actual / prescribed, capped at 1.0 so exceeding the prescription doesn't over-reward) and the stimulus earned:
+```
+bucketFatigue_now = Σ over historical events e in this bucket [ fatigueCost(e) × doseRatio(e) × 0.5 ^ (hoursElapsed(e, now) / halfLifeHours) ]
+```
+
+using the bucket's `recoveryClass.halfLifeHours` ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)). This feeds the fatigue penalty in [Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions) scoring — it's a soft signal, not an eligibility check (the `minRestHours`/`maxPerDay`/`maxPerWeek` gate is a separate, harder check computed directly from event timestamps and counts in that same bucket).
+
+## 5.4 Capability Score Growth
+
+For each capability an exercise trains, a historical event contributes stimulus:
 
 ```
 stimulusEarned[c] = capabilityEffects[c] × doseRatio
 ```
 
-This value adds to today's per-capability stimulus (used in [Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today)) regardless of outcome. It **also** grows the permanent capability score, with diminishing returns as the score approaches its target — but only if the completion was clean (see conditions below):
+where `doseRatio` is actual dose over prescribed dose, capped at 1.0 so exceeding the prescription doesn't over-reward.
+
+`score[c]` ([2.4](./02-capabilities.md#24-capability-state-derived)) is computed by folding this over every qualifying historical event in chronological order, applying diminishing returns as the running score approaches its target:
 
 ```
-scoreIncrement[c] = stimulusEarned[c] × 0.1 × (1 − score[c] / target[c])
+scoreIncrement[c] = stimulusEarned[c] × 0.1 × (1 − runningScore[c] / target[c])
 ```
 
-Example:
+Example (one step of the fold):
 
 ```json
 {
@@ -40,36 +52,38 @@ Example:
   "capabilityEffects_knee_capacity": 6,
   "doseRatio": 1.0,
   "stimulusEarned": 6,
-  "currentScore": 22,
+  "runningScoreBeforeThisEvent": 22,
   "target": 75,
   "scoreIncrement": 0.47,
-  "newScore": 22.47
+  "runningScoreAfterThisEvent": 22.47
 }
 ```
 
-Do not apply the score increment (stimulus still counts toward today's total) if:
+An event is skipped in the fold (contributes 0 to `scoreIncrement`, though it still counts toward that day's stimulus total, [5.7](#57-daily-progress)) if:
 
 - pain exceeded `painLimit`
 - form was poor
 - user stopped early due to discomfort
 - RPE was far above target
 
-## 5.5 Update Pain Risk
+## 5.5 Pain Risk
 
-If `maxPain > painLimit`, or the user stopped early due to discomfort, flag the exercise `elevatedRisk = true`. While flagged:
+An exercise is `elevatedRisk` if its **most recent** historical event (or its regression's most recent event) had `maxPain > painLimit` or an early stop due to discomfort. This is a direct lookup, not a stored flag: check the latest qualifying event each time eligibility ([Step 6](./06-decision-pipeline.md#step-6--generate-candidate-actions)) or scoring ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)) needs it.
 
-- the exercise receives a flat **−30** `riskPenalty` in [Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions) scoring, on top of its baseline `riskLevel` penalty
+While `elevatedRisk`:
+
+- the exercise receives a flat **−30** `riskPenalty` in Step 7 scoring, on top of its baseline `riskLevel` penalty
 - [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)'s variation logic is forced to prefer its regression over the exercise itself or any of its progressions
 
-The flag clears the next time that exercise (or one of its regressions) is completed with `maxPain ≤ painLimit` and no early stop — it does not expire on a timer.
+The flag isn't "cleared" so much as it simply stops being true the next time that exercise (or one of its regressions) is completed with `maxPain ≤ painLimit` and no early stop — because at that point, the most recent qualifying event no longer indicates elevated risk.
 
-## 5.6 Update Variation History
+## 5.6 Variation History
 
-Record movement pattern, family, and variant.
+"Recently repeated movement pattern/family/variant" ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) is read directly from recent history — look at the last few days of events and note their `movementPattern`, `familyId`, and exercise id. Nothing is separately recorded; the event log already has this.
 
-## 5.7 Update Today Progress
+## 5.7 Daily Progress
 
-Increase daily stimulus score (5.4's `stimulusEarned`, regardless of whether it also grew the permanent capability score).
+`currentStimulusScore` ([Section 6](./08-daily-progress.md)) is the sum of `stimulusEarned` ([5.4](#54-capability-score-growth)) across all of today's events (today defined by the user's `timezone`, [2.1](./02-capabilities.md#21-user-profile)), regardless of whether a given event's `scoreIncrement` was skipped. Trying hard on a rep scheme and stopping early due to discomfort still counts as useful stimulus for the day, even though it doesn't grow the permanent capability score.
 
 ---
 

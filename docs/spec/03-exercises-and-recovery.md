@@ -50,8 +50,8 @@ Built on top of the [free-exercise-db](https://github.com/yuhonas/free-exercise-
 | `riskLevel` | baseline risk penalty input ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)) |
 | `recoveryClass` | [2.8](#28-recovery-classes) |
 | `snackSafeWhenCold` | whether this can be done without a warm-up |
-| `capabilityEffects` | per-capability stimulus value ([5.4](./07-result-processing.md#54-update-capability-scores)) |
-| `fatigueCost` | per-capability/tissue fatigue added ([5.3](./07-result-processing.md#53-update-fatigue)) |
+| `capabilityEffects` | per-capability stimulus value ([5.4](./07-result-processing.md#54-capability-score-growth)) |
+| `fatigueCost` | single scalar — fatigue contributed to this exercise's `(movementPattern, recoveryClass)` bucket per full-dose completion ([5.3](./07-result-processing.md#53-fatigue)). Not per-capability: fatigue is tracked only at the bucket level (2.8), so there's nothing to break down by capability |
 | `substitutes` | alternate exercises for the same slot |
 | `regressions` | easier variants ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) |
 | `progressions` | harder variants ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) |
@@ -97,12 +97,7 @@ Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/bl
     "lower_body_strength": 5,
     "fall_resilience": 2
   },
-  "fatigueCost": {
-    "posterior_chain": 20,
-    "lower_body_strength": 12,
-    "low_back": 12,
-    "knee_capacity": 4
-  },
+  "fatigueCost": 20,
   "substitutes": [
     "Stiff-Legged_Dumbbell_Deadlift",
     "kettlebell_deadlift",
@@ -120,7 +115,7 @@ Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/bl
 
 `Stiff-Legged_Dumbbell_Deadlift` and `Kettlebell_One-Legged_Deadlift` are real free-exercise-db entries. `kettlebell_deadlift` (plain bilateral), `hip_hinge_dowel`, and `romanian_deadlift_light` are `baseSource: "custom"` — dose variants and coaching-cue drills that don't exist as distinct database entries.
 
-`capabilityEffects` is also the basis for stimulus and capability growth ([5.4](./07-result-processing.md#54-update-capability-scores)), and `fatigueCost` is also the basis for the fatigue penalty in scoring ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)).
+`capabilityEffects` is also the basis for stimulus and capability growth ([5.4](./07-result-processing.md#54-capability-score-growth)), and `fatigueCost` is also the basis for the fatigue penalty in scoring ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)).
 
 Used by `next` logic for filtering, scoring, safety, recovery, variation, and explanation.
 
@@ -218,13 +213,7 @@ Defines minimum recovery rules and fatigue decay rates.
 
 **Scope:** recovery is tracked per **(movementPattern, recoveryClass)** pair — not per specific exercise, and not globally per recovery class. Doing a `heavy_strength` hinge exercise (e.g. barbell RDL) blocks other `heavy_strength` hinge exercises for `minRestHours` and counts toward `hinge:heavy_strength`'s `maxPerDay`/`maxPerWeek`. It does **not** block `heavy_strength` squat work, and does not block `light`-class hinge work — those are different buckets. This lets fatigued tissue groups rest independently of unrelated movement patterns, while still preventing someone from dodging intended rest by swapping to a different exercise of the same class and pattern.
 
-**Fatigue decay:** each bucket's fatigue decays exponentially using its recovery class's `halfLifeHours`, independent of the hard eligibility gate:
-
-```
-fatigue_now = fatigue_added × 0.5 ^ (hoursElapsed / halfLifeHours)
-```
-
-This decayed value feeds the fatigue penalty in [Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions) scoring — it's a soft signal, not an eligibility check (the `minRestHours`/`maxPerDay`/`maxPerWeek` gate above already handles hard blocking).
+**Fatigue is derived, not stored:** a bucket's current fatigue is a decayed sum over every historical event in that bucket, using the bucket's `halfLifeHours` — see [5.3](./07-result-processing.md#53-fatigue) for the formula. It feeds the fatigue penalty in [Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions) scoring as a soft signal; it's independent of the hard eligibility gate above (`minRestHours`/`maxPerDay`/`maxPerWeek`, which are computed directly from event timestamps and counts, not from decayed fatigue).
 
 ---
 

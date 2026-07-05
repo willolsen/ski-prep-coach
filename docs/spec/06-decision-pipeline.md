@@ -9,27 +9,30 @@ The `next` engine must run in this order.
 Load:
 
 - user profile
-- current capability state
 - exercise library
 - recovery classes
-- recent events
-- readiness state
+- full event history (or as much of it as the derivations in [Section 5](./07-result-processing.md) need)
+- readiness state (today's manual entry, [2.10](./04-history-and-readiness.md#210-readiness-state))
 - current date/time (in the user's timezone, [2.1](./02-capabilities.md#21-user-profile))
 
-## Step 2 — Update Derived State
+There is no separate "current capability state" to load — it doesn't exist as stored data. It's computed in Step 2 from the event history just loaded.
 
-Before choosing an action, recompute:
+## Step 2 — Compute Derived State
 
-- current warmth
-- decayed fatigue ([2.8](./03-exercises-and-recovery.md#28-recovery-classes))
-- recovered (movementPattern, recoveryClass) buckets
-- today's stimulus
+Before choosing an action, compute fresh from the event history (nothing here is read from a cache that could be stale — see [Section 5](./07-result-processing.md) for each formula):
+
+- capability scores and trends ([2.4](./02-capabilities.md#24-capability-state-derived))
+- current warmth ([5.2](./07-result-processing.md#52-warmth))
+- decayed fatigue per `(movementPattern, recoveryClass)` bucket ([5.3](./07-result-processing.md#53-fatigue))
+- recovered buckets (hard eligibility gate, [2.8](./03-exercises-and-recovery.md#28-recovery-classes))
+- today's stimulus ([5.7](./07-result-processing.md#57-daily-progress))
 - readiness status
-- recently repeated movement patterns
+- recently repeated movement patterns ([5.6](./07-result-processing.md#56-variation-history))
+- elevatedRisk flags ([5.5](./07-result-processing.md#55-pain-risk))
 - blocked exercises
 - limiting capabilities
 
-This ensures stale state does not drive decisions.
+This ensures stale state can never drive decisions, because there is no stored state to go stale — every one of these is recomputed from the event log each time.
 
 ## Step 3 — Safety Veto
 
@@ -55,7 +58,7 @@ Possible output:
 
 ## Step 4 — Determine Whether Enough Has Been Done Today
 
-Compute `todayStimulusScore` as a priority-weighted sum of today's per-capability stimulus earned (stimulus per event is defined in [5.4](./07-result-processing.md#54-update-capability-scores)):
+Compute `todayStimulusScore` as a priority-weighted sum of today's per-capability stimulus earned (stimulus per event is defined in [5.4](./07-result-processing.md#54-capability-score-growth)):
 
 ```
 stimulusScore = Σ_c stimulusEarnedToday[c] × (priority[c] / 10)
@@ -123,7 +126,7 @@ An exercise is initially eligible if:
 - its `(movementPattern, recoveryClass)` bucket is eligible ([2.8](./03-exercises-and-recovery.md#28-recovery-classes))
 - target capability is useful
 - fatigue cost is acceptable
-- not currently flagged `elevatedRisk` without an eligible regression available ([5.5](./07-result-processing.md#55-update-pain-risk))
+- not currently flagged `elevatedRisk` without an eligible regression available ([5.5](./07-result-processing.md#55-pain-risk))
 
 Example blocked exercise:
 
@@ -143,10 +146,12 @@ Each candidate gets a score:
 score(exercise) =
     Σ_c [ capabilityEffects[c] × (priority[c] / 10) × (1.5 if c is limiting else 1.0) ]
   + enjoymentBonus            (+10 flat if the exercise is tagged to a liked activity, else 0)
-  − Σ_c [ fatigueCost[c] × (currentFatigue[c] / 100) ]
+  − fatigueCost × (currentBucketFatigue[movementPattern, recoveryClass] / 100)
   − repetitionPenalty         (recency-based, decays over ~3 days; see Step 8)
   − riskPenalty               (riskLevel baseline: low=0, moderate=5, high=15; +30 if elevatedRisk flagged — 5.5)
 ```
+
+`currentBucketFatigue` is the exercise's own `(movementPattern, recoveryClass)` bucket fatigue ([5.3](./07-result-processing.md#53-fatigue)) — a single number, since fatigue is tracked per bucket, not per capability (2.8).
 
 Example:
 
@@ -177,7 +182,7 @@ Rules:
 - Do not repeat the same exercise too often if safe substitutes exist (already penalized via `repetitionPenalty` in [Step 7](#step-7--score-candidate-actions)).
 - Do not vary so much that progression becomes unmeasurable.
 - Prefer variants in the same movement family when the same training effect is desired.
-- Use regressions if readiness or warmth is low, or if the exercise is flagged `elevatedRisk` ([5.5](./07-result-processing.md#55-update-pain-risk)).
+- Use regressions if readiness or warmth is low, or if the exercise is flagged `elevatedRisk` ([5.5](./07-result-processing.md#55-pain-risk)).
 - Use progressions only when recent results justify it.
 
 Example:

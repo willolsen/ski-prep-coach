@@ -127,11 +127,19 @@ target = min(100, 25 + 5 × priority)
 | fall_resilience | 6 | 55 |
 | upper_body_strength | 5 | 50 |
 
-Capability scores ([2.4](#24-user-capability-state)) are on a 0–100 scale, measured against these targets. Targets drive [Step 5](./06-decision-pipeline.md#step-5--identify-limiting-capabilities) (limiting capabilities) and [Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today) (daily stimulus).
+Capability scores ([2.4](#24-capability-state-derived)) are on a 0–100 scale, measured against these targets. Targets drive [Step 5](./06-decision-pipeline.md#step-5--identify-limiting-capabilities) (limiting capabilities) and [Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today) (daily stimulus).
 
-## 2.4 User Capability State
+## 2.4 Capability State (Derived)
 
-Stores the current estimate of user ability, on a 0–100 scale (see [2.3](#23-capability-targets) for targets).
+**Nothing here is stored.** A user's capability state is computed on demand, entirely from [User Activity History](./04-history-and-readiness.md#29-user-activity-history) (2.9) plus the current time — there is no separate persisted "capability state" document to keep in sync with the event log. This is a deliberate architectural principle, not just true of capability score: see the [Core Principle](./01-purpose-and-principles.md#9-core-principle) note on derived vs. stored state, which also applies to fatigue ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)) and warmth ([2.11](./04-history-and-readiness.md#211-warmth-state)).
+
+**`score[c]`** — replay every historical `exercise_result` event that trains capability `c`, in chronological order, applying the growth formula from [5.4](./07-result-processing.md#54-capability-score-growth) one event at a time, starting from 0. The result is exactly the same diminishing-returns curve described there; it's just computed by folding over history rather than incrementally mutating a stored number.
+
+**`trend`** — compare `score[c]` as of now against `score[c]` as of ~14 days ago (both computed via the same replay, just truncating history at different cutoff times). Improving if meaningfully higher, declining if meaningfully lower, stable otherwise.
+
+**`lastTrainedAt`** — the `completedAt` of the most recent historical event that trained capability `c`.
+
+Example — what a `GET` of this computed view returns (not what's stored):
 
 ```json
 {
@@ -140,31 +148,27 @@ Stores the current estimate of user ability, on a 0–100 scale (see [2.3](#23-c
     "knee_capacity": {
       "score": 22,
       "trend": "improving",
-      "lastTrainedAt": "2026-07-04T09:20:00-07:00",
-      "fatigue": 12
+      "lastTrainedAt": "2026-07-04T09:20:00-07:00"
     },
     "lower_body_strength": {
       "score": 18,
       "trend": "stable",
-      "lastTrainedAt": "2026-07-03T16:00:00-07:00",
-      "fatigue": 30
+      "lastTrainedAt": "2026-07-03T16:00:00-07:00"
     },
     "balance": {
       "score": 28,
       "trend": "improving",
-      "lastTrainedAt": "2026-07-04T11:30:00-07:00",
-      "fatigue": 4
+      "lastTrainedAt": "2026-07-04T11:30:00-07:00"
     }
   }
 }
 ```
 
-Fields:
+There is no per-capability `fatigue` field here — fatigue is tracked only once, scoped per `(movementPattern, recoveryClass)` bucket, in [2.8](./03-exercises-and-recovery.md#28-recovery-classes).
 
-- `score`: 0–100, measured against the target in [2.3](#23-capability-targets).
-- `trend`: improving, stable, declining, unknown.
-- `lastTrainedAt`: used for recovery and variation.
-- `fatigue`: current decayed fatigue for that capability (see [2.8](./03-exercises-and-recovery.md#28-recovery-classes) for the decay formula).
+**Implementation note:** replaying full history on every request is fine at this scale (a single user's event log stays small enough to fold in milliseconds for years of daily use). An implementation may cache this computation for performance, but the cache is never authoritative — it must always match a full replay of 2.9 exactly, and can be invalidated or rebuilt from the event log alone at any time.
+
+This is also what makes onboarding simple (see [3.3](./05-server-api.md#33-onboarding)): backfilling a few weeks of historical exercises is just inserting ordinary events with backdated timestamps — there's no separate "initial state" to bootstrap.
 
 ---
 

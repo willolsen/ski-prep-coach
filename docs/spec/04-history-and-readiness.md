@@ -6,7 +6,7 @@ Part of **2. Core Data Objects**. This file covers 2.9–2.11. User/capability m
 
 ## 2.9 User Activity History
 
-Every completed or attempted action is stored as an event — including acknowledged `rest` recommendations (see [3.1](./05-server-api.md#31-get-next-action)), which log the same way as exercise results.
+Every completed or attempted action is stored as an event — including acknowledged `rest` recommendations (see [3.1](./05-server-api.md#31-get-next-action)), which log the same way as exercise results. **This is the only behavioral state SkiPrepCoach persists.** Capability score, fatigue, warmth, pain-risk flags, and daily progress are not stored anywhere else — they're all computed from this event log on demand (see [Section 5](./07-result-processing.md)).
 
 ```json
 {
@@ -15,6 +15,7 @@ Every completed or attempted action is stored as an event — including acknowle
       "eventId": "evt-001",
       "userId": "user-001",
       "type": "exercise_result",
+      "source": "live",
       "startedAt": "2026-07-04T09:00:00-07:00",
       "completedAt": "2026-07-04T09:04:00-07:00",
       "exerciseId": "wall_sit",
@@ -37,7 +38,9 @@ Every completed or attempted action is stored as an event — including acknowle
 }
 ```
 
-Used to update capability, fatigue, warmth, exercise variation, readiness, and progression.
+`source` is `"live"` for events logged through the normal `GET /next` → `POST /result` loop, or `"onboarding"` for events backfilled through the [onboarding endpoint](./05-server-api.md#33-onboarding) (3.3) before the user's first real session. Both are ordinary events and count identically in every derivation — `source` exists only for auditability (e.g. "show me what I entered during onboarding vs. logged live").
+
+Used to derive capability score, fatigue, warmth, pain risk, variation history, and daily progress ([Section 5](./07-result-processing.md)).
 
 ## 2.10 Readiness State
 
@@ -65,15 +68,15 @@ Used early in the `next` pipeline.
 
 ## 2.11 Warmth State
 
-Warmth is computed, not manually selected.
+Like capability state ([2.4](./02-capabilities.md#24-capability-state-derived)) and fatigue ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)), warmth is **not stored** — it's computed on demand from recent events. See [5.2](./07-result-processing.md#52-warmth) for the decay formula (20-minute half-life).
+
+Example of what a computed warmth lookup returns:
 
 ```json
 {
   "warmth": {
     "score": 42,
-    "state": "warm",
-    "updatedAt": "2026-07-04T09:04:00-07:00",
-    "source": "computed"
+    "state": "warm"
   }
 }
 ```
@@ -90,9 +93,7 @@ Suggested states:
 }
 ```
 
-Warmth increases after movement and decays with inactivity.
-
-Example warmth effects:
+Example warmth effects (flat contribution per full-dose completion, decaying per [5.2](./07-result-processing.md#52-warmth)):
 
 ```json
 {

@@ -119,15 +119,47 @@ Body:
 }
 ```
 
-Server responsibilities:
+Server responsibility: **store the event** ([5.1](./07-result-processing.md#51-store-event)). That's the entire write. Warmth, fatigue, capability score, recovery eligibility, and daily progress are all derived from the event log on the next `GET /next` call ([Section 5](./07-result-processing.md)) — there's nothing else to update.
 
-1. Store event.
-2. Update warmth.
-3. Update fatigue.
-4. Update capability estimates.
-5. Update daily progress.
-6. Update recovery predictions.
-7. Make next recommendation available.
+## 3.3 Onboarding
+
+```
+POST /api/users/{userId}/onboarding
+```
+
+Because capability state, fatigue, and warmth are all derived from history rather than stored ([2.4](./02-capabilities.md#24-capability-state-derived)), bootstrapping a new user is simple: there's no separate "initial state" to compute or seed — just insert ordinary historical events. This endpoint lets a first-time user backfill exercises from roughly the last few weeks before their first real `GET /next` call, so the engine isn't starting from a blank slate.
+
+Body:
+
+```json
+{
+  "entries": [
+    {
+      "exerciseId": "bodyweight_squat",
+      "occurredAt": "2026-06-20T09:00:00-07:00",
+      "actual": {
+        "setsCompleted": 3,
+        "reps": 10,
+        "maxPain": 1,
+        "rpe": 5
+      }
+    },
+    {
+      "exerciseId": "walk_easy",
+      "occurredAt": "2026-06-23T18:00:00-07:00",
+      "actual": {
+        "durationSecCompleted": 1200,
+        "maxPain": 0,
+        "rpe": 3
+      }
+    }
+  ]
+}
+```
+
+Each entry is stored as an ordinary `exercise_result` event ([2.9](./04-history-and-readiness.md#29-user-activity-history)) with `source: "onboarding"` and `startedAt`/`completedAt` set from `occurredAt`. No `recommendationId` is needed or expected — these entries were never preceded by a `GET /next` call, unlike normal results ([3.2](#32-submit-result)). Entries don't need a `prescribed` block either, since there was no prescription to compare against; dose ratio ([5.4](./07-result-processing.md#54-capability-score-growth)) falls back to 1.0 for onboarding entries.
+
+There's no hard limit on how far back entries can go, but only the last few days matter for fatigue/warmth — both fully decay well within a couple of weeks ([5.2](./07-result-processing.md#52-warmth), [5.3](./07-result-processing.md#53-fatigue)) regardless of what's backfilled. Older entries still help by giving the capability score replay ([5.4](./07-result-processing.md#54-capability-score-growth)) a more accurate starting point than assuming zero prior training.
 
 ---
 
