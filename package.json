@@ -5,6 +5,7 @@
   "type": "module",
   "description": "SkiPrepCoach closed-loop coaching engine",
   "scripts": {
+    "dev": "tsx watch --env-file=.env src/server.ts",
     "sync:exercises": "tsx scripts/sync-exercise-db.ts",
     "gallery:exercises": "tsx scripts/generate-exercise-gallery.ts",
     "db:migrate": "tsx --env-file=.env db/migrate.ts",
@@ -12,6 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.8",
+    "hono": "^4.12.27",
     "pg": "^8.13.1"
   },
   "devDependencies": {
