@@ -1,0 +1,23 @@
+[
+  {
+    "userId": "user-001",
+    "displayName": "Will",
+    "availableEquipment": [
+      "gym",
+      "dumbbells",
+      "barbell",
+      "bike",
+      "rollerblades",
+      "pickleball_court",
+      "hiking_trails"
+    ],
+    "movementPatternRestrictions": {
+      "squat": "mild"
+    },
+    "preferences": {
+      "likes": ["rollerblading", "hiking", "pickleball"],
+      "dislikes": [],
+      "preferredSessionStyle": "next_action"
+    }
+  }
+]

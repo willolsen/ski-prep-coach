@@ -1,0 +1,44 @@
+{
+  "daily": {
+    "minRestHours": 6,
+    "maxPerDay": 6,
+    "maxPerWeek": 42,
+    "halfLifeHours": 9
+  },
+  "light": {
+    "minRestHours": 12,
+    "maxPerDay": 3,
+    "maxPerWeek": 14,
+    "halfLifeHours": 18
+  },
+  "moderate": {
+    "minRestHours": 24,
+    "maxPerDay": 2,
+    "maxPerWeek": 6,
+    "halfLifeHours": 36
+  },
+  "heavy_strength": {
+    "minRestHours": 48,
+    "maxPerDay": 1,
+    "maxPerWeek": 3,
+    "halfLifeHours": 72
+  },
+  "max_strength": {
+    "minRestHours": 72,
+    "maxPerDay": 1,
+    "maxPerWeek": 2,
+    "halfLifeHours": 108
+  },
+  "plyometric": {
+    "minRestHours": 48,
+    "maxPerDay": 1,
+    "maxPerWeek": 3,
+    "halfLifeHours": 72
+  },
+  "hiit": {
+    "minRestHours": 48,
+    "maxPerDay": 1,
+    "maxPerWeek": 2,
+    "halfLifeHours": 72
+  }
+}

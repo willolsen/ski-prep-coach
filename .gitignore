@@ -1,6 +1,7 @@
 node_modules/
 dist/
 *.log
+.env
 
 # Fetched on demand by `npm run sync:exercises -- --with-images`; not committed (thousands of small binary files).
 data/free-exercise-db/images/

@@ -1,0 +1,43 @@
+{
+  "knee_capacity": {
+    "name": "Knee Capacity",
+    "priority": 10,
+    "description": "Ability of knees and surrounding tissues to tolerate skiing-relevant load."
+  },
+  "lower_body_strength": {
+    "name": "Lower Body Strength",
+    "priority": 9
+  },
+  "posterior_chain": {
+    "name": "Posterior Chain",
+    "priority": 8
+  },
+  "balance": {
+    "name": "Balance",
+    "priority": 9
+  },
+  "mobility": {
+    "name": "Mobility",
+    "priority": 7
+  },
+  "aerobic_endurance": {
+    "name": "Aerobic Endurance",
+    "priority": 7
+  },
+  "stamina": {
+    "name": "Stamina",
+    "priority": 8
+  },
+  "reaction": {
+    "name": "Reaction",
+    "priority": 6
+  },
+  "upper_body_strength": {
+    "name": "Upper Body Strength",
+    "priority": 5
+  },
+  "fall_resilience": {
+    "name": "Fall Resilience",
+    "priority": 6
+  }
+}

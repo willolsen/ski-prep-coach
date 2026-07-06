@@ -12,5 +12,5 @@
     "outDir": "dist",
     "noUncheckedIndexedAccess": true
   },
-  "include": ["scripts/**/*.ts", "src/**/*.ts"]
+  "include": ["scripts/**/*.ts", "src/**/*.ts", "db/**/*.ts"]
 }
