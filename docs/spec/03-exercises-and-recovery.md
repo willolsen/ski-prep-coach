@@ -1,12 +1,12 @@
-# Data Model: Movement Patterns, Exercises & Recovery (2.5–2.8)
+# Data Model: Movement Patterns, Exercises & Recovery
 
 [← Index](../README.md) · Previous: [Capabilities](./02-capabilities.md) · Next: [History & Readiness →](./04-history-and-readiness.md)
 
-Part of **2. Core Data Objects**. This file covers 2.5–2.8. User/capability model lives in [2.1–2.4](./02-capabilities.md); history, readiness, and warmth live in [2.9–2.11](./04-history-and-readiness.md).
+User/capability model lives in [User Profile & Capabilities](./02-capabilities.md); history, readiness, and warmth live in [History & Readiness](./04-history-and-readiness.md).
 
-## 2.5 Movement Patterns
+## Movement Patterns
 
-Every exercise has exactly one primary `movementPattern`, used for variation logic ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)) and to scope recovery tracking ([2.8](#28-recovery-classes)). SkiPrepCoach uses the standard 7-pattern kinesiology taxonomy:
+Every exercise has exactly one primary `movementPattern`, used for variation logic ([Apply Variation Rules](./06-decision-pipeline.md#apply-variation-rules)) and to scope recovery tracking ([Recovery Classes](#recovery-classes)). SkiPrepCoach uses the standard 7-pattern kinesiology taxonomy:
 
 - `squat`
 - `hinge`
@@ -16,9 +16,9 @@ Every exercise has exactly one primary `movementPattern`, used for variation log
 - `rotation`
 - `gait_locomotion` (walking, running, carrying, skating)
 
-## 2.6 Exercise Definition
+## Exercise Definition
 
-Built on top of the [free-exercise-db](https://github.com/yuhonas/free-exercise-db) schema ([schema.json](https://github.com/yuhonas/free-exercise-db/blob/main/schema.json)) as the base layer, extended with SkiPrepCoach-specific fields. **free-exercise-db is the primary source for exercise data** — its 800+ exercises can be dropped in with zero field-mapping; each only needs the SkiPrepCoach extension fields authored before it's eligible for recommendation (see [Section 7](./09-mvp-exercises.md)).
+Built on top of the [free-exercise-db](https://github.com/yuhonas/free-exercise-db) schema ([schema.json](https://github.com/yuhonas/free-exercise-db/blob/main/schema.json)) as the base layer, extended with SkiPrepCoach-specific fields. **free-exercise-db is the primary source for exercise data** — its 800+ exercises can be dropped in with zero field-mapping; each only needs the SkiPrepCoach extension fields authored before it's eligible for recommendation (see [Initial MVP Exercise Set](./09-mvp-exercises.md)).
 
 **Base fields** (verbatim from free-exercise-db):
 
@@ -40,22 +40,22 @@ Built on top of the [free-exercise-db](https://github.com/yuhonas/free-exercise-
 
 | field | purpose |
 |---|---|
-| `baseSource` | `"free-exercise-db"` or `"custom"` — provenance. `"custom"` is for exercises authored specifically for SkiPrepCoach with no free-exercise-db equivalent (most of the MVP set in [Section 7](./09-mvp-exercises.md)) |
+| `baseSource` | `"free-exercise-db"` or `"custom"` — provenance. `"custom"` is for exercises authored specifically for SkiPrepCoach with no free-exercise-db equivalent (most of the MVP set in [Initial MVP Exercise Set](./09-mvp-exercises.md)) |
 | `icon` | display emoji |
-| `movementPattern` | one of the 7 ids in [2.5](#25-movement-patterns) — free-exercise-db has no equivalent concept |
-| `familyId` | groups variants for [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)'s computed substitute/regression/progression logic |
-| `progressionLevel` | a number placing this exercise on a difficulty scale, comparable only against other exercises sharing its `familyId` (or, failing that, its `movementPattern`) — see [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules) |
+| `movementPattern` | one of the 7 ids in [Movement Patterns](#movement-patterns) — free-exercise-db has no equivalent concept |
+| `familyId` | groups variants for [Apply Variation Rules](./06-decision-pipeline.md#apply-variation-rules)'s computed substitute/regression/progression logic |
+| `progressionLevel` | a number placing this exercise on a difficulty scale, comparable only against other exercises sharing its `familyId` (or, failing that, its `movementPattern`) — see [Apply Variation Rules](./06-decision-pipeline.md#apply-variation-rules) |
 | `variantTags` | free-form tags used in scoring/variation |
 | `safetyNotes` | shown to the user; distinct from `instructions` |
-| `generalWarmthRequired` | minimum general (whole-body) warmth needed ([5.2](./07-result-processing.md#52-warmth); see [2.11](./04-history-and-readiness.md#211-warmth-state)) |
-| `movementPatternWarmthRequired` | minimum warmth needed specifically in this exercise's own `movementPattern` bucket ([5.2](./07-result-processing.md#52-warmth)) |
-| `riskLevel` | baseline risk penalty input ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)) |
-| `recoveryClass` | [2.8](#28-recovery-classes) |
-| `capabilityEffects` | per-capability stimulus value ([5.4](./07-result-processing.md#54-capability-score-growth)) |
-| `fatigueCost` | single scalar — fatigue contributed to this exercise's `(movementPattern, recoveryClass)` bucket per full-dose completion ([5.3](./07-result-processing.md#53-fatigue)). Not per-capability: fatigue is tracked only at the bucket level (2.8), so there's nothing to break down by capability |
-| `warmthEffect` | single scalar — warmth contributed per full-dose completion ([5.2](./07-result-processing.md#52-warmth); see [2.11](./04-history-and-readiness.md#211-warmth-state)) |
+| `generalWarmthRequired` | minimum general (whole-body) warmth needed ([Warmth](./07-result-processing.md#warmth); see [Warmth State](./04-history-and-readiness.md#warmth-state)) |
+| `movementPatternWarmthRequired` | minimum warmth needed specifically in this exercise's own `movementPattern` bucket ([Warmth](./07-result-processing.md#warmth)) |
+| `riskLevel` | baseline risk penalty input ([Score Candidate Actions](./06-decision-pipeline.md#score-candidate-actions)) |
+| `recoveryClass` | [Recovery Classes](#recovery-classes) |
+| `capabilityEffects` | per-capability stimulus value ([Capability Score Growth](./07-result-processing.md#capability-score-growth)) |
+| `fatigueCost` | single scalar — fatigue contributed to this exercise's `(movementPattern, recoveryClass)` bucket per full-dose completion ([Fatigue](./07-result-processing.md#fatigue)). Not per-capability: fatigue is tracked only at the [bucket level](#recovery-classes), so there's nothing to break down by capability |
+| `warmthEffect` | single scalar — warmth contributed per full-dose completion ([Warmth](./07-result-processing.md#warmth); see [Warmth State](./04-history-and-readiness.md#warmth-state)) |
 
-There is deliberately no `substitutes`, `regressions`, or `progressions` field — **exercises do not reference each other.** An earlier version of this schema stored those as explicit arrays of exercise ids, which meant every new exercise required manually updating other exercises' arrays to point back at it, and kept the same information twice (once in the array, once implicitly in `familyId`/`movementPattern`). Now `familyId` plus `progressionLevel` are the only two pieces of data needed; which exercises count as substitutes, regressions, or progressions for a given exercise is computed at query time ([Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules), [Section 11](./12-data-layer.md)), not stored anywhere.
+There is deliberately no `substitutes`, `regressions`, or `progressions` field — **exercises do not reference each other.** An earlier version of this schema stored those as explicit arrays of exercise ids, which meant every new exercise required manually updating other exercises' arrays to point back at it, and kept the same information twice (once in the array, once implicitly in `familyId`/`movementPattern`). Now `familyId` plus `progressionLevel` are the only two pieces of data needed; which exercises count as substitutes, regressions, or progressions for a given exercise is computed at query time ([Apply Variation Rules](./06-decision-pipeline.md#apply-variation-rules), [Data Layer](./13-data-layer.md)), not stored anywhere.
 
 Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Romanian_Deadlift.json), base fields exactly as published, extended with SkiPrepCoach fields:
 
@@ -104,13 +104,13 @@ Example — [`Romanian_Deadlift`](https://github.com/yuhonas/free-exercise-db/bl
 }
 ```
 
-`Stiff-Legged_Dumbbell_Deadlift`, `Kettlebell_One-Legged_Deadlift`, and other same-family exercises are no longer listed on this exercise at all — they're found by querying for `familyId: "hip_hinge"` when needed (see [Step 8](./06-decision-pipeline.md#step-8--apply-variation-rules)), each with its own `progressionLevel` to rank them.
+`Stiff-Legged_Dumbbell_Deadlift`, `Kettlebell_One-Legged_Deadlift`, and other same-family exercises are no longer listed on this exercise at all — they're found by querying for `familyId: "hip_hinge"` when needed (see [Apply Variation Rules](./06-decision-pipeline.md#apply-variation-rules)), each with its own `progressionLevel` to rank them.
 
-`capabilityEffects` is also the basis for stimulus and capability growth ([5.4](./07-result-processing.md#54-capability-score-growth)), and `fatigueCost` is also the basis for the fatigue penalty in scoring ([Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions)).
+`capabilityEffects` is also the basis for stimulus and capability growth ([Capability Score Growth](./07-result-processing.md#capability-score-growth)), and `fatigueCost` is also the basis for the fatigue penalty in scoring ([Score Candidate Actions](./06-decision-pipeline.md#score-candidate-actions)).
 
 Used by `next` logic for filtering, scoring, safety, recovery, variation, and explanation.
 
-## 2.7 Exercise Prescription
+## Exercise Prescription
 
 A concrete recommended dose.
 
@@ -149,7 +149,7 @@ Rep-based example:
 
 Used as the returned `nextAction`.
 
-## 2.8 Recovery Classes
+## Recovery Classes
 
 Defines minimum recovery rules and fatigue decay rates.
 
@@ -204,7 +204,7 @@ Defines minimum recovery rules and fatigue decay rates.
 
 **Scope:** recovery is tracked per **(movementPattern, recoveryClass)** pair — not per specific exercise, and not globally per recovery class. Doing a `heavy_strength` hinge exercise (e.g. barbell RDL) blocks other `heavy_strength` hinge exercises for `minRestHours` and counts toward `hinge:heavy_strength`'s `maxPerDay`/`maxPerWeek`. It does **not** block `heavy_strength` squat work, and does not block `light`-class hinge work — those are different buckets. This lets fatigued tissue groups rest independently of unrelated movement patterns, while still preventing someone from dodging intended rest by swapping to a different exercise of the same class and pattern.
 
-**Fatigue is derived, not stored:** a bucket's current fatigue is a decayed sum over every historical event in that bucket, using the bucket's `halfLifeHours` — see [5.3](./07-result-processing.md#53-fatigue) for the formula. It feeds the fatigue penalty in [Step 7](./06-decision-pipeline.md#step-7--score-candidate-actions) scoring as a soft signal; it's independent of the hard eligibility gate above (`minRestHours`/`maxPerDay`/`maxPerWeek`, which are computed directly from event timestamps and counts, not from decayed fatigue).
+**Fatigue is derived, not stored:** a bucket's current fatigue is a decayed sum over every historical event in that bucket, using the bucket's `halfLifeHours` — see [Fatigue](./07-result-processing.md#fatigue) for the formula. It feeds the fatigue penalty in [Score Candidate Actions](./06-decision-pipeline.md#score-candidate-actions) scoring as a soft signal; it's independent of the hard eligibility gate above (`minRestHours`/`maxPerDay`/`maxPerWeek`, which are computed directly from event timestamps and counts, not from decayed fatigue).
 
 ---
 

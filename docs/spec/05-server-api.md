@@ -1,16 +1,16 @@
-# 3. Server API
+# Server API
 
 [← Index](../README.md) · Previous: [History & Readiness](./04-history-and-readiness.md) · Next: [Decision Pipeline →](./06-decision-pipeline.md)
 
-## 3.1 Get Next Action
+## Get Next Action
 
 ```
 GET /api/users/{userId}/next?timezone=America/Los_Angeles&now=2026-07-04T09:00:00-07:00
 ```
 
-`timezone` is required — there's no stored user-level timezone (2.1) to fall back on. The engine needs the athlete's *current* local timezone to compute "today" for daily stimulus ([Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today)) and recovery-class daily counts ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)), and the client is the only party that reliably knows it right now.
+`timezone` is required — there's no stored [user-level timezone](./02-capabilities.md#user-profile) to fall back on. The engine needs the athlete's *current* local timezone to compute "today" for daily stimulus ([Determine Whether Enough Has Been Done Today](./06-decision-pipeline.md#determine-whether-enough-has-been-done-today)) and recovery-class daily counts ([Recovery Classes](./03-exercises-and-recovery.md#recovery-classes)), and the client is the only party that reliably knows it right now.
 
-`now` is **optional** — an ISO8601 instant. If omitted, the server substitutes its own real clock. If supplied, that value is what "now" means for every derivation this call touches (fatigue decay, warmth decay, daily stimulus, recovery windows, repetition recency, recommendation expiry) — see the [Core Principle](./01-purpose-and-principles.md#9-core-principle) note on why time is threaded through explicitly rather than read ambiently. A real client just always passes the actual current time; this parameter mainly exists so a test can simulate "3 days later" without waiting or faking the system clock.
+`now` is **optional** — an ISO8601 instant. If omitted, the server substitutes its own real clock. If supplied, that value is what "now" means for every derivation this call touches (fatigue decay, warmth decay, daily stimulus, recovery windows, repetition recency, recommendation expiry) — see the [Core Principle](./11-core-principle.md) note on why time is threaded through explicitly rather than read ambiently. A real client just always passes the actual current time; this parameter mainly exists so a test can simulate "3 days later" without waiting or faking the system clock.
 
 A `recommendationId` is generated whenever a new `nextAction` (exercise **or** rest) is produced. Calling `GET /next` again before that recommendation is resolved returns the identical pinned recommendation (same `recommendationId`) rather than recomputing — this prevents the action changing out from under the user mid-session. A pending recommendation that's never resolved expires and is recomputed fresh after 4 hours, checked against the same `now`.
 
@@ -96,11 +96,11 @@ If rest is best:
 }
 ```
 
-The rest recommendation is acknowledged via the same `POST /result` endpoint (3.2), typically with a minimal `actual` payload, which resolves the pinned recommendation and logs the event.
+The rest recommendation is acknowledged via the same [`POST /result`](#submit-result) endpoint, typically with a minimal `actual` payload, which resolves the pinned recommendation and logs the event.
 
-Note that a pending recommendation isn't the only thing a user can act on — see [3.3](#33-logging-without-a-recommendation) for logging an exercise that wasn't the recommended action.
+Note that a pending recommendation isn't the only thing a user can act on — see [Logging Without a Recommendation](#logging-without-a-recommendation) for logging an exercise that wasn't the recommended action.
 
-## 3.2 Submit Result
+## Submit Result
 
 ```
 POST /api/users/{userId}/results
@@ -126,7 +126,7 @@ Body:
 }
 ```
 
-`timezone` is the client's current timezone at submission time, stored on the event itself (2.9) rather than looked up from a profile — see [2.9](./04-history-and-readiness.md#29-user-activity-history) for why it's captured per-event instead of per-user.
+`timezone` is the client's current timezone at submission time, stored on the [event itself](./04-history-and-readiness.md#user-activity-history) rather than looked up from a profile — see [User Activity History](./04-history-and-readiness.md#user-activity-history) for why it's captured per-event instead of per-user.
 
 Returns:
 
@@ -137,11 +137,11 @@ Returns:
 }
 ```
 
-Server responsibility: **store the event** ([5.1](./07-result-processing.md#51-store-event)). That's the entire write. Warmth, fatigue, capability score, recovery eligibility, and daily progress are all derived from the event log on the next `GET /next` call ([Section 5](./07-result-processing.md)) — there's nothing else to update.
+Server responsibility: **store the event** ([Store Event](./07-result-processing.md#store-event)). That's the entire write. Warmth, fatigue, capability score, recovery eligibility, and daily progress are all derived from the event log on the next `GET /next` call ([Submitting a Result](./07-result-processing.md)) — there's nothing else to update.
 
-`actual.notes` is free text and is stored verbatim. Nothing in the engine reads it today — see [2.9](./04-history-and-readiness.md#29-user-activity-history) for why it's captured anyway.
+`actual.notes` is free text and is stored verbatim. Nothing in the engine reads it today — see [User Activity History](./04-history-and-readiness.md#user-activity-history) for why it's captured anyway.
 
-## 3.3 Logging Without a Recommendation
+## Logging Without a Recommendation
 
 ```
 POST /api/users/{userId}/log
@@ -187,7 +187,7 @@ Body (batch, as onboarding typically needs; a self-directed log is usually just 
 }
 ```
 
-Each entry is stored as an ordinary `exercise_result` event ([2.9](./04-history-and-readiness.md#29-user-activity-history)) with `startedAt`/`completedAt` set from `occurredAt`. No `recommendationId` is needed or expected — unlike [3.2](#32-submit-result), these entries were never preceded by a `GET /next` call. Entries don't need a `prescribed` block either, since there was no prescription to compare against; dose ratio ([5.4](./07-result-processing.md#54-capability-score-growth)) falls back to 1.0.
+Each entry is stored as an ordinary `exercise_result` event ([User Activity History](./04-history-and-readiness.md#user-activity-history)) with `startedAt`/`completedAt` set from `occurredAt`. No `recommendationId` is needed or expected — unlike [Submit Result](#submit-result), these entries were never preceded by a `GET /next` call. Entries don't need a `prescribed` block either, since there was no prescription to compare against; dose ratio ([Capability Score Growth](./07-result-processing.md#capability-score-growth)) falls back to 1.0.
 
 Returns:
 
@@ -200,13 +200,13 @@ Returns:
 
 `timezone` is per-entry rather than one value for the whole batch, since an onboarding backfill can span weeks and, in principle, a trip through a different timezone — each entry's day-boundary calculations use whatever timezone was actually in effect for that entry.
 
-No eligibility or safety check applies to logging itself — this endpoint is a factual record of what the user says happened, not a request for a recommendation, so there's nothing to veto. Its consequences (fatigue added to the relevant bucket, capability growth, a possible `elevatedRisk` flag if pain was high) show up automatically the next time those are derived ([Section 5](./07-result-processing.md)), the same as for any other event.
+No eligibility or safety check applies to logging itself — this endpoint is a factual record of what the user says happened, not a request for a recommendation, so there's nothing to veto. Its consequences (fatigue added to the relevant bucket, capability growth, a possible `elevatedRisk` flag if pain was high) show up automatically the next time those are derived ([Submitting a Result](./07-result-processing.md)), the same as for any other event.
 
-Logging here has no effect on any currently pending recommendation from `GET /next` ([3.1](#31-get-next-action)) — it's untouched, and still resolves normally via `POST /result` or expires after its usual 4-hour timeout.
+Logging here has no effect on any currently pending recommendation from `GET /next` ([Get Next Action](#get-next-action)) — it's untouched, and still resolves normally via `POST /result` or expires after its usual 4-hour timeout.
 
-There's no hard limit on how far back `occurredAt` can go, but only the last few days matter for fatigue/warmth — both fully decay well within a couple of weeks ([5.2](./07-result-processing.md#52-warmth), [5.3](./07-result-processing.md#53-fatigue)) regardless of what's backfilled. Older entries still help by giving the capability score replay ([5.4](./07-result-processing.md#54-capability-score-growth)) a more accurate starting point than assuming zero prior training.
+There's no hard limit on how far back `occurredAt` can go, but only the last few days matter for fatigue/warmth — both fully decay well within a couple of weeks ([Warmth](./07-result-processing.md#warmth), [Fatigue](./07-result-processing.md#fatigue)) regardless of what's backfilled. Older entries still help by giving the capability score replay ([Capability Score Growth](./07-result-processing.md#capability-score-growth)) a more accurate starting point than assuming zero prior training.
 
-## 3.4 Submit Readiness
+## Submit Readiness
 
 ```
 POST /api/users/{userId}/readiness
@@ -226,11 +226,11 @@ Body:
 }
 ```
 
-`painNow`/`morningStiffness`/`swelling`/`stairs`/`sleepQuality` are defined in [2.10](./04-history-and-readiness.md#210-readiness-state).
+`painNow`/`morningStiffness`/`swelling`/`stairs`/`sleepQuality` are defined in [Readiness State](./04-history-and-readiness.md#readiness-state).
 
-Like [3.1](#31-get-next-action), `now` is optional (defaults to the server's real clock) and exists for the same reason: simulating a specific moment in tests. Unlike `GET /next`, here `now` also determines *which day's entry this is* — `date` (2.10) is derived as `now` converted into the given `timezone`'s calendar date, not submitted directly. Computing it this way rather than accepting a raw date string keeps it consistent with every other day-boundary calculation in the system (Step 4, 2.8, 5.7), all of which derive "today" from `(now, timezone)` the same way.
+Like [Get Next Action](#get-next-action), `now` is optional (defaults to the server's real clock) and exists for the same reason: simulating a specific moment in tests. Unlike `GET /next`, here `now` also determines *which day's entry this is* — [`date`](./04-history-and-readiness.md#readiness-state) is derived as `now` converted into the given `timezone`'s calendar date, not submitted directly. Computing it this way rather than accepting a raw date string keeps it consistent with every other day-boundary calculation in the system ([Determine Whether Enough Has Been Done Today](./06-decision-pipeline.md#determine-whether-enough-has-been-done-today), [Recovery Classes](./03-exercises-and-recovery.md#recovery-classes), [Daily Progress](./07-result-processing.md#daily-progress)), all of which derive "today" from `(now, timezone)` the same way.
 
-`computedStatus` (2.10) is derived and stored at submission time from the fields above **and** `aggregateFatigue` ([2.10](./04-history-and-readiness.md#210-readiness-state)) computed as of this same `now`.
+[`computedStatus`](./04-history-and-readiness.md#readiness-state) is derived and stored at submission time from the fields above **and** `aggregateFatigue` ([Readiness State](./04-history-and-readiness.md#readiness-state)) computed as of this same `now`.
 
 Returns:
 

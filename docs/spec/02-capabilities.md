@@ -1,10 +1,10 @@
-# Data Model: User Profile & Capabilities (2.1–2.4)
+# Data Model: User Profile & Capabilities
 
-[← Index](../README.md) · Previous: [Purpose & Core Principle](./01-purpose-and-principles.md) · Next: [Exercises & Recovery →](./03-exercises-and-recovery.md)
+[← Index](../README.md) · Previous: [Purpose](./01-purpose.md) · Next: [Exercises & Recovery →](./03-exercises-and-recovery.md)
 
-Part of **2. Core Data Objects**. This file covers 2.1–2.4 (the user and capability model). Exercises and recovery live in [2.5–2.8](./03-exercises-and-recovery.md); history, readiness, and warmth live in [2.9–2.11](./04-history-and-readiness.md).
+Covers the user and capability model. Exercises and recovery live in [Exercises & Recovery](./03-exercises-and-recovery.md); history, readiness, and warmth live in [History & Readiness](./04-history-and-readiness.md).
 
-## 2.1 User Profile
+## User Profile
 
 Stores stable user-level information.
 
@@ -34,13 +34,13 @@ Stores stable user-level information.
 
 Used by `next` logic to filter exercises, prioritize goals, and bias recommendations toward enjoyable options.
 
-`movementPatternRestrictions` maps a subset of the 7 movement patterns ([2.5](./03-exercises-and-recovery.md#25-movement-patterns)) to a restriction level: `"mild"` (only low-intensity exercises of that pattern are eligible) or `"avoid"` (that pattern is excluded from candidates entirely). Patterns not listed have no restriction. This replaces an earlier, more specific `constraints` design (knee sensitivity, low back caution, etc.) — rather than modeling each individual sensitivity and mapping it to affected exercises, the engine only needs to know which movement patterns the user should approach cautiously or not at all, and lets [Step 6](./06-decision-pipeline.md#step-6--generate-candidate-actions) apply that directly. See [Step 6](./06-decision-pipeline.md#step-6--generate-candidate-actions) for exactly how `"mild"` and `"avoid"` affect eligibility.
+`movementPatternRestrictions` maps a subset of the 7 movement patterns ([Movement Patterns](./03-exercises-and-recovery.md#movement-patterns)) to a restriction level: `"mild"` (only low-intensity exercises of that pattern are eligible) or `"avoid"` (that pattern is excluded from candidates entirely). Patterns not listed have no restriction. This replaces an earlier, more specific `constraints` design (knee sensitivity, low back caution, etc.) — rather than modeling each individual sensitivity and mapping it to affected exercises, the engine only needs to know which movement patterns the user should approach cautiously or not at all, and lets [Generate Candidate Actions](./06-decision-pipeline.md#generate-candidate-actions) apply that directly. See [Generate Candidate Actions](./06-decision-pipeline.md#generate-candidate-actions) for exactly how `"mild"` and `"avoid"` affect eligibility.
 
-There is deliberately no `primaryGoal` field — that information is already implied by which capabilities (2.2) exist and how they're prioritized, so a separate goal label would just be redundant with data the engine already has. There is likewise deliberately no `targetDate` or deadline field — the engine has no concept of time remaining toward a goal.
+There is deliberately no `primaryGoal` field — that information is already implied by which [capabilities](#capability-definitions) exist and how they're prioritized, so a separate goal label would just be redundant with data the engine already has. There is likewise deliberately no `targetDate` or deadline field — the engine has no concept of time remaining toward a goal.
 
-There is also no `timezone` field. Day-boundary calculations ([Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today), [2.8](./03-exercises-and-recovery.md#28-recovery-classes)) need the athlete's *current* local timezone, not a fixed stored one — so the client sends it with every request where the server needs to know "what day is it," rather than the server trusting a profile field that could go stale (e.g. while traveling). See [2.9](./04-history-and-readiness.md#29-user-activity-history) and [3.1](./05-server-api.md#31-get-next-action) for where it's actually supplied.
+There is also no `timezone` field. Day-boundary calculations ([Determine Whether Enough Has Been Done Today](./06-decision-pipeline.md#determine-whether-enough-has-been-done-today), [Recovery Classes](./03-exercises-and-recovery.md#recovery-classes)) need the athlete's *current* local timezone, not a fixed stored one — so the client sends it with every request where the server needs to know "what day is it," rather than the server trusting a profile field that could go stale (e.g. while traveling). See [User Activity History](./04-history-and-readiness.md#user-activity-history) and [Get Next Action](./05-server-api.md#get-next-action) for where it's actually supplied.
 
-## 2.2 Capability Definitions
+## Capability Definitions
 
 Capabilities are things the engine tries to improve.
 
@@ -94,7 +94,7 @@ Capabilities are things the engine tries to improve.
 
 Used to score candidate actions. Higher-priority capabilities receive more weight, especially if currently undertrained or limiting.
 
-## 2.3 Capability Targets
+## Capability Targets
 
 Each capability's target score is **derived from its priority** rather than hand-authored as a separate number, so the two can't drift out of sync:
 
@@ -115,13 +115,13 @@ target = min(100, 25 + 5 × priority)
 | fall_resilience | 6 | 55 |
 | upper_body_strength | 5 | 50 |
 
-Capability scores ([2.4](#24-capability-state-derived)) are on a 0–100 scale, measured against these targets. Targets drive [Step 5](./06-decision-pipeline.md#step-5--identify-limiting-capabilities) (limiting capabilities) and [Step 4](./06-decision-pipeline.md#step-4--determine-whether-enough-has-been-done-today) (daily stimulus).
+Capability scores ([Capability State (Derived)](#capability-state-derived)) are on a 0–100 scale, measured against these targets. Targets drive [Identify Limiting Capabilities](./06-decision-pipeline.md#identify-limiting-capabilities) (limiting capabilities) and [Determine Whether Enough Has Been Done Today](./06-decision-pipeline.md#determine-whether-enough-has-been-done-today) (daily stimulus).
 
-## 2.4 Capability State (Derived)
+## Capability State (Derived)
 
-**Nothing here is stored.** A user's capability state is computed on demand, entirely from [User Activity History](./04-history-and-readiness.md#29-user-activity-history) (2.9) plus the current time — there is no separate persisted "capability state" document to keep in sync with the event log. This is a deliberate architectural principle, not just true of capability score: see the [Core Principle](./01-purpose-and-principles.md#9-core-principle) note on derived vs. stored state, which also applies to fatigue ([2.8](./03-exercises-and-recovery.md#28-recovery-classes)) and warmth ([2.11](./04-history-and-readiness.md#211-warmth-state)).
+**Nothing here is stored.** A user's capability state is computed on demand, entirely from [User Activity History](./04-history-and-readiness.md#user-activity-history) plus the current time — there is no separate persisted "capability state" document to keep in sync with the event log. This is a deliberate architectural principle, not just true of capability score: see the [Core Principle](./11-core-principle.md) note on derived vs. stored state, which also applies to fatigue ([Recovery Classes](./03-exercises-and-recovery.md#recovery-classes)) and warmth ([Warmth State](./04-history-and-readiness.md#warmth-state)).
 
-**`score[c]`** — replay every historical `exercise_result` event that trains capability `c`, in chronological order, applying the growth formula from [5.4](./07-result-processing.md#54-capability-score-growth) one event at a time, starting from 0. The result is exactly the same diminishing-returns curve described there; it's just computed by folding over history rather than incrementally mutating a stored number.
+**`score[c]`** — replay every historical `exercise_result` event that trains capability `c`, in chronological order, applying the growth formula from [Capability Score Growth](./07-result-processing.md#capability-score-growth) one event at a time, starting from 0. The result is exactly the same diminishing-returns curve described there; it's just computed by folding over history rather than incrementally mutating a stored number.
 
 **`lastTrainedAt`** — the `completedAt` of the most recent historical event that trained capability `c`.
 
@@ -149,12 +149,12 @@ Example — what a `GET` of this computed view returns (not what's stored):
 }
 ```
 
-There is no per-capability `fatigue` field here — fatigue is tracked only once, scoped per `(movementPattern, recoveryClass)` bucket, in [2.8](./03-exercises-and-recovery.md#28-recovery-classes).
+There is no per-capability `fatigue` field here — fatigue is tracked only once, scoped per `(movementPattern, recoveryClass)` bucket, in [Recovery Classes](./03-exercises-and-recovery.md#recovery-classes).
 
-**Implementation note:** replaying full history on every request is fine at this scale (a single user's event log stays small enough to fold in milliseconds for years of daily use). An implementation may cache this computation for performance, but the cache is never authoritative — it must always match a full replay of 2.9 exactly, and can be invalidated or rebuilt from the event log alone at any time. See [Section 11](./12-data-layer.md#115-deriving-capability-score-the-recursive-fold) for the actual recursive-query pattern that computes this.
+**Implementation note:** replaying full history on every request is fine at this scale (a single user's event log stays small enough to fold in milliseconds for years of daily use). An implementation may cache this computation for performance, but the cache is never authoritative — it must always match a full replay of [User Activity History](./04-history-and-readiness.md#user-activity-history) exactly, and can be invalidated or rebuilt from the event log alone at any time. See [Deriving Capability Score: the Recursive Fold](./13-data-layer.md#deriving-capability-score-the-recursive-fold) for the actual recursive-query pattern that computes this.
 
-This is also what makes onboarding simple (see [3.3](./05-server-api.md#33-logging-without-a-recommendation)): backfilling a few weeks of historical exercises is just inserting ordinary events with backdated timestamps — there's no separate "initial state" to bootstrap.
+This is also what makes onboarding simple (see [Logging Without a Recommendation](./05-server-api.md#logging-without-a-recommendation)): backfilling a few weeks of historical exercises is just inserting ordinary events with backdated timestamps — there's no separate "initial state" to bootstrap.
 
 ---
 
-[← Index](../README.md) · Previous: [Purpose & Core Principle](./01-purpose-and-principles.md) · Next: [Exercises & Recovery →](./03-exercises-and-recovery.md)
+[← Index](../README.md) · Previous: [Purpose](./01-purpose.md) · Next: [Exercises & Recovery →](./03-exercises-and-recovery.md)
