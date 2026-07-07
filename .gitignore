@@ -5,3 +5,6 @@ dist/
 
 # Fetched on demand by `npm run sync:exercises -- --with-images`; not committed (thousands of small binary files).
 data/free-exercise-db/images/
+
+# Generated on demand by `npm run generate:images`; not committed (AI-generated, regeneratable, and large).
+data/generated-images/

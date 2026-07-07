@@ -8,6 +8,8 @@
     "dev": "tsx watch --env-file=.env src/server.ts",
     "sync:exercises": "tsx scripts/sync-exercise-db.ts",
     "gallery:exercises": "tsx scripts/generate-exercise-gallery.ts",
+    "mock:server": "tsx watch scripts/mock-server.ts",
+    "generate:images": "tsx --env-file=.env scripts/generate-exercise-images.ts",
     "db:migrate": "tsx --env-file=.env db/migrate.ts",
     "db:seed": "tsx --env-file=.env db/seed.ts",
     "pretest": "npm run db:migrate && npm run db:seed",
