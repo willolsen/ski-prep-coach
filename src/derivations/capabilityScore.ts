@@ -93,3 +93,10 @@ export async function getCapabilityTargets(pool: Queryable = getPool()): Promise
   );
   return Object.fromEntries(rows.map((r) => [r.capability_id, r.target]));
 }
+
+export async function getCapabilityPriorities(pool: Queryable = getPool()): Promise<Record<string, number>> {
+  const { rows } = await pool.query<{ capability_id: string; priority: number }>(
+    `SELECT capability_id, priority FROM capabilities`,
+  );
+  return Object.fromEntries(rows.map((r) => [r.capability_id, r.priority]));
+}
