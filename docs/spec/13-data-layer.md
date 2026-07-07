@@ -138,11 +138,13 @@ WITH RECURSIVE stimulus AS (
   WHERE e.type = 'exercise_result' AND e.user_id = $1
 ),
 fold AS (
-  SELECT DISTINCT ON (capability_id)
-    capability_id, completed_at,
-    stimulus_earned * 0.1 * (1 - 0::numeric / c.target) AS running_score
-  FROM stimulus s JOIN capabilities c USING (capability_id)
-  ORDER BY capability_id, completed_at ASC
+  (
+    SELECT DISTINCT ON (capability_id)
+      capability_id, completed_at,
+      stimulus_earned * 0.1 * (1 - 0::numeric / c.target) AS running_score
+    FROM stimulus s JOIN capabilities c USING (capability_id)
+    ORDER BY capability_id, completed_at ASC
+  )
 
   UNION ALL
 
