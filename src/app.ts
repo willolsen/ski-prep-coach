@@ -3,14 +3,16 @@
  * Every deployment target (src/server.ts, src/lambda.ts) wraps this same app; nothing
  * about routes or handlers differs by target.
  *
- * All four routes are real. GET /next, POST /results, and POST /log map onto MVP
- * Development Order steps 8-9 (docs/spec/10-mvp-development-order.md); POST
- * /readiness isn't called out as its own step there, but it's the fourth endpoint
- * documented in docs/spec/05-server-api.md, so it's implemented alongside the rest.
+ * All four routes from docs/spec/05-server-api.md are real. GET /next, POST
+ * /results, and POST /log map onto MVP Development Order steps 8-9
+ * (docs/spec/10-mvp-development-order.md); POST /readiness isn't called out as its
+ * own step there but is implemented alongside the rest. GET /state is a fifth
+ * route, not part of the original spec -- see src/pipeline/getDebugState.ts.
  */
 
 import { Hono } from "hono";
 import { getNextAction } from "./pipeline/getNextAction.js";
+import { getDebugState } from "./pipeline/getDebugState.js";
 import { getUserProfile } from "./derivations/userProfile.js";
 import { submitResult } from "./pipeline/submitResult.js";
 import { logEntries } from "./pipeline/logWithoutRecommendation.js";
@@ -38,6 +40,28 @@ app.get("/api/users/:userId/next", async (c) => {
   });
 
   return c.json(result);
+});
+
+app.get("/api/users/:userId/state", async (c) => {
+  const userId = c.req.param("userId");
+  const timezone = c.req.query("timezone");
+  if (!timezone) {
+    return c.json({ error: "timezone query parameter is required" }, 400);
+  }
+  const now = new Date(c.req.query("now") ?? new Date().toISOString());
+
+  const profile = await getUserProfile(userId);
+  if (!profile) {
+    return c.json({ error: `unknown user "${userId}"` }, 404);
+  }
+
+  const state = await getDebugState(userId, timezone, now, {
+    availableEquipment: profile.availableEquipment,
+    movementPatternRestrictions: profile.movementPatternRestrictions,
+    likes: profile.preferences.likes,
+  });
+
+  return c.json(state);
 });
 
 app.post("/api/users/:userId/results", async (c) => {

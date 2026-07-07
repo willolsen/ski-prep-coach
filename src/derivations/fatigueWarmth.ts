@@ -101,3 +101,13 @@ export async function getWarmth(userId: string, now: Date, pool: Queryable = get
     byMovementPattern,
   };
 }
+
+export type WarmthLabel = "cold" | "slightly_warm" | "warm" | "very_warm";
+
+/** Suggested display states for general warmth only (docs/spec/04-history-and-readiness.md#warmth-state). */
+export function warmthLabel(general: number): WarmthLabel {
+  if (general >= 70) return "very_warm";
+  if (general >= 40) return "warm";
+  if (general >= 20) return "slightly_warm";
+  return "cold";
+}

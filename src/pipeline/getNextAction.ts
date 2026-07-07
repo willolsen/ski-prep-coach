@@ -22,7 +22,7 @@ import { buildExerciseExplanation, buildRestExplanation } from "./explanation.js
 import { hasEnoughStimulusToday } from "./dailyStimulus.js";
 import { getPendingRecommendation, setPendingRecommendation } from "../derivations/pendingRecommendation.js";
 import { getDailyProgress } from "../derivations/recovery.js";
-import { getWarmth } from "../derivations/fatigueWarmth.js";
+import { getWarmth, warmthLabel } from "../derivations/fatigueWarmth.js";
 import { getTodayReadiness } from "../derivations/readiness.js";
 import { getExercise, type Exercise } from "../derivations/variation.js";
 
@@ -52,13 +52,6 @@ export interface NextActionResult {
     warmth: "cold" | "slightly_warm" | "warm" | "very_warm";
     limitingCapabilities: string[];
   };
-}
-
-function warmthLabel(general: number): NextActionResult["stateSummary"]["warmth"] {
-  if (general >= 70) return "very_warm";
-  if (general >= 40) return "warm";
-  if (general >= 20) return "slightly_warm";
-  return "cold";
 }
 
 function estimatedDurationSecFor(prescription: DoseSelection["next"]): number | null {

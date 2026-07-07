@@ -243,6 +243,82 @@ Returns:
 
 Submitting again for the same derived `date` overwrites the previous entry for that day (upsert on `(userId, date)`) — useful if something changes later in the day (pain worsens, a nap improves things) and the user wants to update it.
 
+## Get Debug State
+
+```
+GET /api/users/{userId}/state?timezone=America/Los_Angeles&now=2026-07-04T09:00:00-07:00
+```
+
+Not one of the original four endpoints above — added to expose every intermediate value the `next` pipeline computes ([Next Decision Pipeline](./06-decision-pipeline.md)), for debugging now and eventually as the basis for a user-facing "your current state" view. Same `timezone`/`now` contract as [Get Next Action](#get-next-action).
+
+Unlike `GET /next`, this always computes everything fresh: it ignores any pinned recommendation for its own analysis, returning it separately and unmodified under `pendingRecommendation` for comparison rather than reusing it. It also computes candidate scoring and the top candidate's variation/dose analysis regardless of [Safety Veto](./06-decision-pipeline.md#safety-veto) or the daily-stimulus gate, since seeing *why* a rest recommendation was (or would be) chosen is exactly the point.
+
+Returns:
+
+```json
+{
+  "now": "2026-07-04T09:00:00-07:00",
+  "timezone": "America/Los_Angeles",
+  "userId": "user-001",
+  "capabilities": {
+    "knee_capacity": {
+      "score": 22,
+      "target": 75,
+      "priority": 10,
+      "lastTrainedAt": "2026-07-04T09:20:00-07:00",
+      "limitingRank": 53,
+      "undertrained": false,
+      "isLimiting": true
+    }
+  },
+  "limitingCapabilityIds": ["knee_capacity", "lower_body_strength", "balance"],
+  "fatigue": {
+    "byBucket": [
+      { "movementPattern": "squat", "recoveryClass": "moderate", "bucketFatigue": 11.8 }
+    ],
+    "aggregateFatigue": 11.8
+  },
+  "warmth": {
+    "general": 4.4,
+    "byMovementPattern": { "squat": 3.3, "hinge": 0, "lunge": 1.1, "push": 0, "pull": 0, "rotation": 0, "gait_locomotion": 0 },
+    "label": "cold"
+  },
+  "readiness": {
+    "entry": { "painNow": 1, "morningStiffness": "none", "swelling": false, "stairs": "easy", "sleepQuality": "good" },
+    "computedStatus": "green"
+  },
+  "dailyProgress": {
+    "capabilityStimulus": { "knee_capacity": 7, "lower_body_strength": 2 },
+    "currentStimulusScore": 9,
+    "weightedStimulusScore": 8.8,
+    "targetStimulusScore": 70,
+    "enoughStimulusToday": false
+  },
+  "safetyVeto": { "vetoed": false, "reasonCodes": [] },
+  "candidates": [
+    { "exerciseId": "wall_sit", "eligible": true, "eligibilityReasonCodes": [], "score": 82, "scoreReasonCodes": ["trains_limiting_capability"] },
+    { "exerciseId": "barbell_back_squat", "eligible": false, "eligibilityReasonCodes": ["missing_equipment"], "score": null, "scoreReasonCodes": null }
+  ],
+  "topCandidate": {
+    "exerciseId": "wall_sit",
+    "score": 82,
+    "variation": { "exerciseId": "wall_sit", "reason": "no_variation_needed" },
+    "dose": { "exerciseId": "wall_sit", "doseReason": "maintain_dose" }
+  },
+  "pendingRecommendation": null
+}
+```
+
+`capabilities` combines [Capability State (Derived)](./02-capabilities.md#capability-state-derived) (`score`, `lastTrainedAt`) with [Capability Targets](./02-capabilities.md#capability-targets) (`target`, `priority`) and [Identify Limiting Capabilities](./06-decision-pipeline.md#identify-limiting-capabilities)'s own ranking (`limitingRank`, `undertrained`, `isLimiting`) — one object instead of three separate lookups.
+
+`fatigue`, `warmth`, `readiness`, and `dailyProgress` are the [Fatigue](./07-result-processing.md#fatigue), [Warmth](./07-result-processing.md#warmth), [Readiness State](./04-history-and-readiness.md#readiness-state), and [Daily Progress](./07-result-processing.md#daily-progress) values directly. `dailyProgress` includes both the raw `currentStimulusScore` shown elsewhere and the priority-weighted `weightedStimulusScore` that actually drives [Determine Whether Enough Has Been Done Today](./06-decision-pipeline.md#determine-whether-enough-has-been-done-today)'s internal gate — two genuinely different numbers ([Daily Progress](./07-result-processing.md#daily-progress) explains why).
+
+`candidates` covers the **entire exercise library**, not just eligible ones — each entry carries [Generate Candidate Actions](./06-decision-pipeline.md#generate-candidate-actions)'s eligibility result and, for eligible exercises, [Score Candidate Actions](./06-decision-pipeline.md#score-candidate-actions)'s score and reason codes (`null` for ineligible exercises, since they're never scored).
+
+`topCandidate` is [Apply Variation Rules](./06-decision-pipeline.md#apply-variation-rules) and [Select Dose](./06-decision-pipeline.md#select-dose)'s analysis of the highest-scored eligible candidate — computed even on a vetoed or "enough today" day, so it's possible to see what *would* have been picked. `null` only when no candidate is eligible at all.
+
+`pendingRecommendation` is the currently pinned recommendation from `GET /next` ([Get Next Action](#get-next-action)), if any — shown for comparison against this endpoint's own fresh computation, not reused by it.
+
 ---
 
 [← Index](../README.md) · Previous: [History & Readiness](./04-history-and-readiness.md) · Next: [Decision Pipeline →](./06-decision-pipeline.md)

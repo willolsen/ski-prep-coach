@@ -41,6 +41,38 @@ test("GET /next with timezone returns a real recommendation for a known user", a
   }
 });
 
+test("GET /state without timezone returns 400", async () => {
+  const res = await app.request("/api/users/user-001/state");
+  assert.equal(res.status, 400);
+});
+
+test("GET /state returns 404 for an unknown user", async () => {
+  const res = await app.request("/api/users/no-such-user/state?timezone=UTC");
+  assert.equal(res.status, 404);
+});
+
+test("GET /state returns the full computed state without creating a pending recommendation", async () => {
+  const res = await app.request("/api/users/user-001/state?timezone=UTC");
+  const body = (await res.json()) as {
+    capabilities: unknown;
+    fatigue: unknown;
+    warmth: unknown;
+    readiness: unknown;
+    dailyProgress: unknown;
+    safetyVeto: unknown;
+    candidates: unknown[];
+  };
+
+  assert.equal(res.status, 200);
+  assert.ok(body.capabilities);
+  assert.ok(body.fatigue);
+  assert.ok(body.warmth);
+  assert.ok(body.readiness);
+  assert.ok(body.dailyProgress);
+  assert.ok(body.safetyVeto);
+  assert.equal(body.candidates.length, 50);
+});
+
 test("POST /results stores an event when it resolves the currently pinned recommendation", async () => {
   const now = new Date();
   const nextRes = await app.request("/api/users/user-001/next?timezone=UTC");

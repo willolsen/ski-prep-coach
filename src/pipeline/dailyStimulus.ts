@@ -24,6 +24,19 @@ import { getCapabilityPriorities } from "../derivations/capabilityScore.js";
 
 export const DAILY_STIMULUS_TARGET = 70;
 
+/** Pure weighting step, split out so callers that already have capabilityStimulus + priorities (e.g. a combined state/debug view) don't need a second round trip for either. */
+export function computeWeightedStimulusScore(
+  capabilityStimulus: Record<string, number>,
+  priorities: Record<string, number>,
+): number {
+  let stimulusScore = 0;
+  for (const [capabilityId, stimulus] of Object.entries(capabilityStimulus)) {
+    const priority = priorities[capabilityId] ?? 0;
+    stimulusScore += stimulus * (priority / 10);
+  }
+  return stimulusScore;
+}
+
 export async function getWeightedStimulusScore(
   userId: string,
   timezone: string,
@@ -32,13 +45,7 @@ export async function getWeightedStimulusScore(
 ): Promise<number> {
   const dailyProgress = await getDailyProgress(userId, timezone, now, pool);
   const priorities = await getCapabilityPriorities(pool);
-
-  let stimulusScore = 0;
-  for (const [capabilityId, stimulus] of Object.entries(dailyProgress.capabilityStimulus)) {
-    const priority = priorities[capabilityId] ?? 0;
-    stimulusScore += stimulus * (priority / 10);
-  }
-  return stimulusScore;
+  return computeWeightedStimulusScore(dailyProgress.capabilityStimulus, priorities);
 }
 
 export async function hasEnoughStimulusToday(
