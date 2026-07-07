@@ -11,6 +11,7 @@
 
 import { getPool, type Queryable } from "../db.js";
 import { getAggregateFatigue } from "../derivations/fatigueWarmth.js";
+import { getTodayReadiness } from "../derivations/readiness.js";
 
 const PAIN_TOO_HIGH_THRESHOLD = 4;
 const UNSAFE_AGGREGATE_FATIGUE_THRESHOLD = 100;
@@ -20,26 +21,13 @@ export interface SafetyVetoResult {
   reasonCodes: string[];
 }
 
-interface ReadinessRow {
-  entry: { painNow: number; swelling: boolean; stairs: "easy" | "difficult" | "unable" };
-  computed_status: "green" | "yellow" | "red";
-}
-
 export async function checkSafetyVeto(
   userId: string,
   timezone: string,
   now: Date,
   pool: Queryable = getPool(),
 ): Promise<SafetyVetoResult> {
-  const { rows } = await pool.query<ReadinessRow>(
-    `
-    SELECT entry, computed_status
-    FROM readiness_entries
-    WHERE user_id = $1 AND date = ($2::timestamptz AT TIME ZONE $3)::date
-    `,
-    [userId, now.toISOString(), timezone],
-  );
-  const readiness = rows[0] ?? null;
+  const readiness = await getTodayReadiness(userId, timezone, now, pool);
 
   const reasonCodes: string[] = [];
 
@@ -49,7 +37,7 @@ export async function checkSafetyVeto(
     if (readiness.entry.stairs === "difficult" || readiness.entry.stairs === "unable") {
       reasonCodes.push("limp_or_instability");
     }
-    if (readiness.computed_status === "red") reasonCodes.push("safety_red_day");
+    if (readiness.computedStatus === "red") reasonCodes.push("safety_red_day");
   }
 
   const aggregateFatigue = await getAggregateFatigue(userId, now, pool);

@@ -71,6 +71,11 @@ export async function getExercise(exerciseId: string, pool: Queryable = getPool(
   return rows[0] ? mapExercise(rows[0]) : null;
 }
 
+export async function getAllExercises(pool: Queryable = getPool()): Promise<Exercise[]> {
+  const { rows } = await pool.query<ExerciseRow>(`SELECT ${EXERCISE_COLUMNS} FROM exercises`);
+  return rows.map(mapExercise);
+}
+
 /** Same family first; falls back to same movementPattern if the family has no other eligible members. */
 export async function getSubstitutes(exerciseId: string, pool: Queryable = getPool()): Promise<Exercise[]> {
   const { rows } = await pool.query<ExerciseRow>(

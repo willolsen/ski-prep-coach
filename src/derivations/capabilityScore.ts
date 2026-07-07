@@ -85,3 +85,11 @@ export async function getCapabilityScores(
   }
   return result;
 }
+
+/** target = min(100, 25 + 5*priority) (docs/spec/02-capabilities.md#capability-targets) -- a generated column, read here rather than recomputed. */
+export async function getCapabilityTargets(pool: Queryable = getPool()): Promise<Record<string, number>> {
+  const { rows } = await pool.query<{ capability_id: string; target: number }>(
+    `SELECT capability_id, target FROM capabilities`,
+  );
+  return Object.fromEntries(rows.map((r) => [r.capability_id, r.target]));
+}
