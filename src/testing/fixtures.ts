@@ -1,4 +1,7 @@
-/** Test-only helper for inserting events (docs/spec/04-history-and-readiness.md#user-activity-history). */
+/**
+ * Test-only helpers for inserting events (docs/spec/04-history-and-readiness.md#user-activity-history)
+ * and readiness entries (docs/spec/04-history-and-readiness.md#readiness-state).
+ */
 
 import type { Queryable } from "../db.js";
 
@@ -45,5 +48,39 @@ export async function insertExerciseResultEvent(db: Queryable, fixture: EventFix
       doseRatio,
       cleanCompletion,
     ],
+  );
+}
+
+export interface ReadinessFixture {
+  userId?: string;
+  date: string; // 'YYYY-MM-DD'
+  painNow?: number;
+  morningStiffness?: "none" | "mild" | "significant";
+  swelling?: boolean;
+  stairs?: "easy" | "difficult" | "unable";
+  sleepQuality?: "good" | "fair" | "poor";
+  computedStatus: "green" | "yellow" | "red";
+}
+
+export async function insertReadinessEntry(db: Queryable, fixture: ReadinessFixture): Promise<void> {
+  const {
+    userId = "user-001",
+    date,
+    painNow = 0,
+    morningStiffness = "none",
+    swelling = false,
+    stairs = "easy",
+    sleepQuality = "good",
+    computedStatus,
+  } = fixture;
+
+  const entry = { painNow, morningStiffness, swelling, stairs, sleepQuality };
+
+  await db.query(
+    `
+    INSERT INTO readiness_entries (user_id, date, entry, computed_status)
+    VALUES ($1, $2::date, $3, $4)
+    `,
+    [userId, date, JSON.stringify(entry), computedStatus],
   );
 }
