@@ -3,12 +3,14 @@
  * Every deployment target (src/server.ts, src/lambda.ts) wraps this same app; nothing
  * about routes or handlers differs by target.
  *
- * Route bodies are scaffolding only (MVP Development Order step 3,
- * docs/spec/10-mvp-development-order.md) — the decision pipeline, result-processing
- * derivations, and data-layer queries that make them real land in later steps.
+ * GET /next is real (MVP Development Order step 8, docs/spec/10-mvp-development-order.md);
+ * the remaining three routes are still scaffolding -- POST /result, /log, /readiness
+ * land in step 9.
  */
 
 import { Hono } from "hono";
+import { getNextAction } from "./pipeline/getNextAction.js";
+import { getUserProfile } from "./derivations/userProfile.js";
 
 const app = new Hono();
 
@@ -18,12 +20,20 @@ app.get("/api/users/:userId/next", async (c) => {
   if (!timezone) {
     return c.json({ error: "timezone query parameter is required" }, 400);
   }
-  const now = c.req.query("now") ?? new Date().toISOString();
+  const now = new Date(c.req.query("now") ?? new Date().toISOString());
 
-  // TODO: decision pipeline (docs/spec/06-decision-pipeline.md) — load state, compute
-  // derived state, safety veto, candidate generation/scoring, variation, dose,
-  // explanation — using this exact `now`, never an independent clock read.
-  return c.json({ error: "not implemented", userId, timezone, now }, 501);
+  const profile = await getUserProfile(userId);
+  if (!profile) {
+    return c.json({ error: `unknown user "${userId}"` }, 404);
+  }
+
+  const result = await getNextAction(userId, timezone, now, {
+    availableEquipment: profile.availableEquipment,
+    movementPatternRestrictions: profile.movementPatternRestrictions,
+    likes: profile.preferences.likes,
+  });
+
+  return c.json(result);
 });
 
 app.post("/api/users/:userId/results", async (c) => {
