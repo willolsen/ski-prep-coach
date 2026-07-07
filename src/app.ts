@@ -3,14 +3,16 @@
  * Every deployment target (src/server.ts, src/lambda.ts) wraps this same app; nothing
  * about routes or handlers differs by target.
  *
- * GET /next is real (MVP Development Order step 8, docs/spec/10-mvp-development-order.md);
- * the remaining three routes are still scaffolding -- POST /result, /log, /readiness
- * land in step 9.
+ * GET /next, POST /results, and POST /log are real (MVP Development Order steps 8-9,
+ * docs/spec/10-mvp-development-order.md). POST /readiness is still scaffolding --
+ * it isn't called out as its own step in the MVP order.
  */
 
 import { Hono } from "hono";
 import { getNextAction } from "./pipeline/getNextAction.js";
 import { getUserProfile } from "./derivations/userProfile.js";
+import { submitResult } from "./pipeline/submitResult.js";
+import { logEntries } from "./pipeline/logWithoutRecommendation.js";
 
 const app = new Hono();
 
@@ -40,18 +42,21 @@ app.post("/api/users/:userId/results", async (c) => {
   const userId = c.req.param("userId");
   const body = await c.req.json();
 
-  // TODO: store the event (docs/spec/07-result-processing.md#store-event) — the only
-  // write this endpoint does; everything else is derived on the next GET /next.
-  return c.json({ error: "not implemented", userId, body }, 501);
+  const outcome = await submitResult(userId, body);
+  if (!outcome.ok) {
+    return c.json({ error: outcome.error }, outcome.status as 409);
+  }
+
+  return c.json({ status: "ok", eventId: outcome.eventId });
 });
 
 app.post("/api/users/:userId/log", async (c) => {
   const userId = c.req.param("userId");
   const body = await c.req.json();
 
-  // TODO: insert one exercise_result event per entry, source "onboarding" | "self_directed",
-  // no recommendationId (docs/spec/05-server-api.md#logging-without-a-recommendation).
-  return c.json({ error: "not implemented", userId, body }, 501);
+  const eventIds = await logEntries(userId, body.entries ?? []);
+
+  return c.json({ status: "ok", eventIds });
 });
 
 app.post("/api/users/:userId/readiness", async (c) => {
