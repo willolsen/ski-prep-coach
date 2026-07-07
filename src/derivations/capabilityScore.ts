@@ -5,8 +5,7 @@
  * it just replays every historical event in chronological order.
  */
 
-import type { Pool } from "pg";
-import { getPool } from "../db.js";
+import { getPool, type Queryable } from "../db.js";
 
 export interface CapabilityScore {
   score: number;
@@ -15,11 +14,13 @@ export interface CapabilityScore {
 
 export async function getCapabilityScores(
   userId: string,
-  pool: Pool = getPool(),
+  pool: Queryable = getPool(),
 ): Promise<Record<string, CapabilityScore>> {
-  const [foldResult, lastTrainedResult, capabilitiesResult] = await Promise.all([
-    pool.query<{ capability_id: string; score: number }>(
-      `
+  // Sequential, not Promise.all: `pool` may be a single reserved connection (a test
+  // running inside a transaction), and concurrent queries on one connection are a
+  // deprecated pattern in node-postgres.
+  const foldResult = await pool.query<{ capability_id: string; score: number }>(
+    `
       WITH RECURSIVE stimulus AS (
         SELECT
           e.user_id, e.completed_at, ce.key AS capability_id,
@@ -54,22 +55,23 @@ export async function getCapabilityScores(
       SELECT DISTINCT ON (capability_id) capability_id, running_score AS score
       FROM fold
       ORDER BY capability_id, completed_at DESC;
-      `,
-      [userId],
-    ),
-    pool.query<{ capability_id: string; last_trained_at: string }>(
-      `
-      SELECT ce.key AS capability_id, MAX(e.completed_at) AS last_trained_at
-      FROM events e
-      JOIN exercises x ON x.exercise_id = e.exercise_id
-      CROSS JOIN LATERAL jsonb_each_text(x.capability_effects) AS ce(key, value)
-      WHERE e.type = 'exercise_result' AND e.user_id = $1
-      GROUP BY ce.key
-      `,
-      [userId],
-    ),
-    pool.query<{ capability_id: string }>(`SELECT capability_id FROM capabilities`),
-  ]);
+    `,
+    [userId],
+  );
+
+  const lastTrainedResult = await pool.query<{ capability_id: string; last_trained_at: string }>(
+    `
+    SELECT ce.key AS capability_id, MAX(e.completed_at) AS last_trained_at
+    FROM events e
+    JOIN exercises x ON x.exercise_id = e.exercise_id
+    CROSS JOIN LATERAL jsonb_each_text(x.capability_effects) AS ce(key, value)
+    WHERE e.type = 'exercise_result' AND e.user_id = $1
+    GROUP BY ce.key
+    `,
+    [userId],
+  );
+
+  const capabilitiesResult = await pool.query<{ capability_id: string }>(`SELECT capability_id FROM capabilities`);
 
   const scoreById = new Map(foldResult.rows.map((r) => [r.capability_id, r.score]));
   const lastTrainedById = new Map(lastTrainedResult.rows.map((r) => [r.capability_id, r.last_trained_at]));

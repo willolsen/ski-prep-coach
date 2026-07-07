@@ -5,8 +5,7 @@
  * reference each other (docs/spec/03-exercises-and-recovery.md#exercise-definition).
  */
 
-import type { Pool } from "pg";
-import { getPool } from "../db.js";
+import { getPool, type Queryable } from "../db.js";
 
 export interface Exercise {
   exerciseId: string;
@@ -64,7 +63,7 @@ function mapExercise(row: ExerciseRow): Exercise {
   };
 }
 
-export async function getExercise(exerciseId: string, pool: Pool = getPool()): Promise<Exercise | null> {
+export async function getExercise(exerciseId: string, pool: Queryable = getPool()): Promise<Exercise | null> {
   const { rows } = await pool.query<ExerciseRow>(
     `SELECT ${EXERCISE_COLUMNS} FROM exercises WHERE exercise_id = $1`,
     [exerciseId],
@@ -73,7 +72,7 @@ export async function getExercise(exerciseId: string, pool: Pool = getPool()): P
 }
 
 /** Same family first; falls back to same movementPattern if the family has no other eligible members. */
-export async function getSubstitutes(exerciseId: string, pool: Pool = getPool()): Promise<Exercise[]> {
+export async function getSubstitutes(exerciseId: string, pool: Queryable = getPool()): Promise<Exercise[]> {
   const { rows } = await pool.query<ExerciseRow>(
     `
     SELECT ${EXERCISE_COLUMNS} FROM exercises
@@ -92,9 +91,13 @@ export async function getSubstitutes(exerciseId: string, pool: Pool = getPool())
 async function nearestByProgression(
   exerciseId: string,
   direction: "below" | "above",
-  pool: Pool,
+  pool: Queryable,
 ): Promise<Exercise | null> {
-  const [self, substitutes] = await Promise.all([getExercise(exerciseId, pool), getSubstitutes(exerciseId, pool)]);
+  // Sequential, not Promise.all: `pool` may be a single reserved connection (a test
+  // running inside a transaction), and concurrent queries on one connection are a
+  // deprecated pattern in node-postgres.
+  const self = await getExercise(exerciseId, pool);
+  const substitutes = await getSubstitutes(exerciseId, pool);
   if (!self) return null;
 
   const sameFamily = substitutes.filter((e) => e.familyId === self.familyId);
@@ -111,11 +114,11 @@ async function nearestByProgression(
 }
 
 /** The nearest progressionLevel below exerciseId's own, from its substitute set (same family first). */
-export async function getRegression(exerciseId: string, pool: Pool = getPool()): Promise<Exercise | null> {
+export async function getRegression(exerciseId: string, pool: Queryable = getPool()): Promise<Exercise | null> {
   return nearestByProgression(exerciseId, "below", pool);
 }
 
 /** The nearest progressionLevel above exerciseId's own, from its substitute set (same family first). */
-export async function getProgression(exerciseId: string, pool: Pool = getPool()): Promise<Exercise | null> {
+export async function getProgression(exerciseId: string, pool: Queryable = getPool()): Promise<Exercise | null> {
   return nearestByProgression(exerciseId, "above", pool);
 }

@@ -4,7 +4,7 @@
  * changes between local Postgres, RDS, or Azure Database for PostgreSQL.
  */
 
-import { Pool, types } from "pg";
+import { Pool, type PoolClient, types } from "pg";
 
 // pg returns NUMERIC and BIGINT as strings by default, since some values in those
 // types can't be represented exactly as JS numbers. Every numeric/bigint column in
@@ -25,3 +25,9 @@ export function getPool(): Pool {
   }
   return pool;
 }
+
+// Every derivation query only ever needs .query() — accepting either the shared Pool
+// or a single reserved PoolClient lets tests run each case inside its own transaction
+// (docs/spec/06-decision-pipeline.md's testability goal: only time should differ
+// between a test and production, and here it's also true of the connection itself).
+export type Queryable = Pool | PoolClient;

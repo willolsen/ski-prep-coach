@@ -3,8 +3,7 @@
  * (docs/spec/13-data-layer.md#the-rest-recovery-eligibility-pain-risk-daily-progress).
  */
 
-import type { Pool } from "pg";
-import { getPool } from "../db.js";
+import { getPool, type Queryable } from "../db.js";
 
 export interface RecoveryStatus {
   lastDoneAt: string | null;
@@ -24,28 +23,30 @@ export async function getRecoveryStatus(
   movementPattern: string,
   recoveryClass: string,
   now: Date,
-  pool: Pool = getPool(),
+  pool: Queryable = getPool(),
 ): Promise<RecoveryStatus> {
   const nowIso = now.toISOString();
 
-  const [statsResult, classResult] = await Promise.all([
-    pool.query<{ last_done_at: string | null; today_count: number; week_count: number }>(
-      `
-      SELECT
-        MAX(e.completed_at) AS last_done_at,
-        COUNT(*) FILTER (WHERE e.completed_at > $4::timestamptz - interval '1 day') AS today_count,
-        COUNT(*) FILTER (WHERE e.completed_at > $4::timestamptz - interval '7 days') AS week_count
-      FROM events e
-      JOIN exercises x ON x.exercise_id = e.exercise_id
-      WHERE e.user_id = $1 AND x.movement_pattern = $2 AND x.recovery_class = $3
-      `,
-      [userId, movementPattern, recoveryClass, nowIso],
-    ),
-    pool.query<{ min_rest_hours: number; max_per_day: number; max_per_week: number }>(
-      `SELECT min_rest_hours, max_per_day, max_per_week FROM recovery_classes WHERE recovery_class = $1`,
-      [recoveryClass],
-    ),
-  ]);
+  // Sequential, not Promise.all: `pool` may be a single reserved connection (a test
+  // running inside a transaction), and concurrent queries on one connection are a
+  // deprecated pattern in node-postgres.
+  const statsResult = await pool.query<{ last_done_at: string | null; today_count: number; week_count: number }>(
+    `
+    SELECT
+      MAX(e.completed_at) AS last_done_at,
+      COUNT(*) FILTER (WHERE e.completed_at > $4::timestamptz - interval '1 day') AS today_count,
+      COUNT(*) FILTER (WHERE e.completed_at > $4::timestamptz - interval '7 days') AS week_count
+    FROM events e
+    JOIN exercises x ON x.exercise_id = e.exercise_id
+    WHERE e.user_id = $1 AND x.movement_pattern = $2 AND x.recovery_class = $3
+    `,
+    [userId, movementPattern, recoveryClass, nowIso],
+  );
+
+  const classResult = await pool.query<{ min_rest_hours: number; max_per_day: number; max_per_week: number }>(
+    `SELECT min_rest_hours, max_per_day, max_per_week FROM recovery_classes WHERE recovery_class = $1`,
+    [recoveryClass],
+  );
 
   const stats = statsResult.rows[0]!;
   const recoveryClassDef = classResult.rows[0];
@@ -77,7 +78,7 @@ export interface PainRisk {
  * due to discomfort" half of this rule has no dedicated schema field yet, so it isn't
  * checked here.
  */
-export async function getPainRisk(userId: string, exerciseIds: string[], pool: Pool = getPool()): Promise<PainRisk> {
+export async function getPainRisk(userId: string, exerciseIds: string[], pool: Queryable = getPool()): Promise<PainRisk> {
   if (exerciseIds.length === 0) return { elevatedRisk: false, mostRecentEvent: null };
 
   const { rows } = await pool.query<{
@@ -122,7 +123,7 @@ export async function getDailyProgress(
   userId: string,
   timezone: string,
   now: Date,
-  pool: Pool = getPool(),
+  pool: Queryable = getPool(),
 ): Promise<DailyProgress> {
   const { rows } = await pool.query<{ capability_id: string; stimulus_earned: number }>(
     `
@@ -161,7 +162,7 @@ export async function getVariationHistory(
   userId: string,
   days: number,
   now: Date,
-  pool: Pool = getPool(),
+  pool: Queryable = getPool(),
 ): Promise<VariationHistoryEntry[]> {
   const { rows } = await pool.query<{
     exercise_id: string;
