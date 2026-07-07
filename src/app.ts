@@ -3,9 +3,10 @@
  * Every deployment target (src/server.ts, src/lambda.ts) wraps this same app; nothing
  * about routes or handlers differs by target.
  *
- * GET /next, POST /results, and POST /log are real (MVP Development Order steps 8-9,
- * docs/spec/10-mvp-development-order.md). POST /readiness is still scaffolding --
- * it isn't called out as its own step in the MVP order.
+ * All four routes are real. GET /next, POST /results, and POST /log map onto MVP
+ * Development Order steps 8-9 (docs/spec/10-mvp-development-order.md); POST
+ * /readiness isn't called out as its own step there, but it's the fourth endpoint
+ * documented in docs/spec/05-server-api.md, so it's implemented alongside the rest.
  */
 
 import { Hono } from "hono";
@@ -13,6 +14,7 @@ import { getNextAction } from "./pipeline/getNextAction.js";
 import { getUserProfile } from "./derivations/userProfile.js";
 import { submitResult } from "./pipeline/submitResult.js";
 import { logEntries } from "./pipeline/logWithoutRecommendation.js";
+import { submitReadiness } from "./pipeline/submitReadiness.js";
 
 const app = new Hono();
 
@@ -62,11 +64,10 @@ app.post("/api/users/:userId/log", async (c) => {
 app.post("/api/users/:userId/readiness", async (c) => {
   const userId = c.req.param("userId");
   const body = await c.req.json();
-  const now = body.now ?? new Date().toISOString();
 
-  // TODO: derive date from (now, timezone), compute aggregateFatigue as of this same
-  // `now`, upsert readiness_entries on (user_id, date) (docs/spec/05-server-api.md#submit-readiness).
-  return c.json({ error: "not implemented", userId, now, body }, 501);
+  const result = await submitReadiness(userId, body);
+
+  return c.json(result);
 });
 
 export default app;

@@ -1,11 +1,9 @@
 /**
- * GET /next, POST /results, and POST /log are wired to real logic (MVP Development
- * Order steps 8-9, docs/spec/10-mvp-development-order.md); POST /readiness is still
- * scaffolding. Each route's own decision/write logic is thoroughly covered by its
- * pipeline module's own tests against isolated transactions -- these tests are thin
- * smoke tests of the route wiring itself, run against the real shared pool (no
- * transaction available at the HTTP layer), so whatever they create is explicitly
- * cleaned up afterward rather than rolled back.
+ * All four routes are wired to real logic. Each route's own decision/write logic is
+ * thoroughly covered by its pipeline module's own tests against isolated
+ * transactions -- these tests are thin smoke tests of the route wiring itself, run
+ * against the real shared pool (no transaction available at the HTTP layer), so
+ * whatever they create is explicitly cleaned up afterward rather than rolled back.
  */
 
 import { test } from "node:test";
@@ -120,11 +118,27 @@ test("POST /log stores one event per entry", async () => {
   }
 });
 
-test("POST /readiness is a 501 stub", async () => {
-  const res = await app.request("/api/users/user-001/readiness", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ timezone: "America/Los_Angeles", painNow: 1 }),
-  });
-  assert.equal(res.status, 501);
+test("POST /readiness stores a real entry and returns its derived date and computedStatus", async () => {
+  try {
+    const res = await app.request("/api/users/user-001/readiness", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        now: "2026-07-10T07:30:00-07:00",
+        timezone: "America/Los_Angeles",
+        painNow: 1,
+        morningStiffness: "none",
+        swelling: false,
+        stairs: "easy",
+        sleepQuality: "good",
+      }),
+    });
+    const body = (await res.json()) as { date: string; computedStatus: string };
+
+    assert.equal(res.status, 200);
+    assert.equal(body.date, "2026-07-10");
+    assert.equal(body.computedStatus, "green");
+  } finally {
+    await getPool().query("DELETE FROM readiness_entries WHERE user_id = 'user-001' AND date = '2026-07-10'");
+  }
 });
