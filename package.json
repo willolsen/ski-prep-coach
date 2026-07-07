@@ -12,6 +12,7 @@
     "generate:images": "tsx --env-file=.env scripts/generate-exercise-images.ts",
     "db:migrate": "tsx --env-file=.env db/migrate.ts",
     "db:seed": "tsx --env-file=.env db/seed.ts",
+    "backfill:history": "tsx --env-file=.env scripts/backfill-history.ts",
     "pretest": "npm run db:migrate && npm run db:seed",
     "test": "tsx --env-file=.env --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
