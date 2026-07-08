@@ -35,7 +35,12 @@ after(async () => {
 });
 
 interface NextActionBody {
-  nextAction: { type: string; recommendationId: string; exerciseId?: string };
+  nextAction: {
+    type: string;
+    recommendationId: string;
+    exerciseId?: string;
+    prescription?: { sets?: number; durationSec?: number; reps?: number } | null;
+  };
 }
 
 async function fetchNext(now: string): Promise<NextActionBody> {
@@ -179,6 +184,28 @@ test("a resolved rest recommendation does not appear in history", async () => {
       [USER_ID, now],
     );
     await getPool().query(`DELETE FROM readiness_entries WHERE user_id = $1 AND date = '2026-08-04'`, [USER_ID]);
+    await clearPendingRecommendation(USER_ID);
+  }
+});
+
+test("a fresh recommendation for an exercise with no prior history still includes a usable prescription", async () => {
+  // The client's timer/set-logger UI (ExerciseTimer, SetLogger) only render when
+  // prescription.durationSec or prescription.reps is present -- this is the
+  // exact HTTP-contract regression that silently broke them once the real
+  // backend (which, unlike scripts/mock-server.ts, has no history to fall back
+  // on for a brand-new user) started serving `prescription: null` forever.
+  const now = "2026-08-06T09:00:00-07:00";
+  const next = await fetchNext(now);
+  try {
+    if (next.nextAction.type === "exercise") {
+      const { prescription } = next.nextAction;
+      assert.ok(prescription, "a fresh exercise recommendation should include a synthesized default prescription");
+      assert.ok(
+        typeof prescription!.durationSec === "number" || typeof prescription!.reps === "number",
+        "prescription should specify a duration or rep count for the timer/set-logger to render",
+      );
+    }
+  } finally {
     await clearPendingRecommendation(USER_ID);
   }
 });

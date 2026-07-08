@@ -4,12 +4,30 @@ import { selectDose } from "./selectDose.js";
 import { withTransaction } from "../testing/withTransaction.js";
 import { insertExerciseResultEvent } from "../testing/fixtures.js";
 
-test("with no prior history, flags that a default prescription is needed rather than guessing one", async () => {
+test("with no prior history, synthesizes a conservative default prescription from a static-force exercise", async () => {
   await withTransaction(async (db) => {
     const dose = await selectDose("user-test-fixture", "wall_sit", db);
 
-    assert.equal(dose.doseReason, "no_prior_history_needs_default_prescription");
-    assert.equal(dose.next, undefined);
+    assert.equal(dose.doseReason, "no_prior_history_using_default_prescription");
+    assert.deepEqual(dose.next, { sets: 3, durationSec: 30, restSec: 45, targetRpe: 5, painLimit: 3 });
+  });
+});
+
+test("with no prior history, synthesizes a duration-based default prescription for a cardio exercise", async () => {
+  await withTransaction(async (db) => {
+    const dose = await selectDose("user-test-fixture", "zone2_trail_hiking", db);
+
+    assert.equal(dose.doseReason, "no_prior_history_using_default_prescription");
+    assert.deepEqual(dose.next, { sets: 1, durationSec: 900, restSec: 0, targetRpe: 5, painLimit: 3 });
+  });
+});
+
+test("with no prior history, synthesizes a reps-based default prescription for a non-static, non-cardio exercise", async () => {
+  await withTransaction(async (db) => {
+    const dose = await selectDose("user-test-fixture", "bodyweight_squat", db);
+
+    assert.equal(dose.doseReason, "no_prior_history_using_default_prescription");
+    assert.deepEqual(dose.next, { sets: 3, reps: 10, restSec: 45, targetRpe: 5, painLimit: 3 });
   });
 });
 
