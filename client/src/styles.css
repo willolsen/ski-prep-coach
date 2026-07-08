@@ -79,6 +79,30 @@ body {
   gap: 1rem;
 }
 
+/* Dev-only time-travel controls (docs/spec/11-core-principle.md's explicit-`now`
+   design is what makes this possible without a server change) — visually set
+   apart from the real app chrome below it, since it isn't part of the product. */
+.time-travel-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.8rem;
+}
+
+.time-travel-bar__clock {
+  flex: 1;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.time-travel-bar .button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
 .tab-bar {
   display: flex;
   border-bottom: 1px solid var(--border);
@@ -126,12 +150,39 @@ body {
   display: none;
 }
 
-.placeholder-panel {
-  padding: 3rem 1.25rem;
-  text-align: center;
+/* History (Overall tab) */
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-list__day-separator {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--text-muted);
-  border: 1px dashed var(--border);
-  border-radius: 16px;
+}
+
+.history-list li:first-child .history-list__day-separator {
+  margin-top: 0;
+  border-top: none;
+}
+
+.history-list__entry {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.1rem;
+}
+
+.history-list__icon {
+  font-size: 1.1rem;
 }
 
 /* Today progress */

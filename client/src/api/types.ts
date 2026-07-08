@@ -83,3 +83,22 @@ export interface SubmitResultResponse {
   status: "ok";
   eventId: string;
 }
+
+/**
+ * Not part of the spec's four endpoints -- mirrors the real server's own
+ * GET /api/users/:userId/history (src/derivations/history.ts), added to back
+ * the Overall tab's history view. Only exercise_result events; date is
+ * pre-derived server-side from (completedAt, that event's own timezone).
+ */
+export interface HistoryEntry {
+  eventId: string;
+  exerciseId: string;
+  title: string;
+  icon: string | null;
+  completedAt: string;
+  date: string;
+}
+
+export interface HistoryResponse {
+  history: HistoryEntry[];
+}

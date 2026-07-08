@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { currentTimezone, getNextAction, submitResult } from "../api/client";
-import type { ActualResult, NextActionResponse } from "../api/types";
+import { currentTimezone, getHistory, getNextAction, submitResult } from "../api/client";
+import type { ActualResult, HistoryEntry, NextActionResponse } from "../api/types";
 import { CompleteActionForm, type CompletionPrefill } from "../components/CompleteActionForm";
 import { ExerciseTimer } from "../components/ExerciseTimer";
 import { FocusLabel } from "../components/FocusLabel";
+import { HistoryList } from "../components/HistoryList";
 import { ExerciseFullImage, NextActionCard } from "../components/NextActionCard";
 import { SetLogger } from "../components/SetLogger";
 import { StateSummary } from "../components/StateSummary";
 import { TabBar, type TabDef } from "../components/TabBar";
+import { TimeTravelBar } from "../components/TimeTravelBar";
 import { TodayProgress } from "../components/TodayProgress";
 
 type View = "action" | "timer" | "sets" | "form";
@@ -25,13 +27,22 @@ export function AppShell({ userId }: { userId: string }) {
   const [exerciseSubTab, setExerciseSubTab] = useState<ExerciseSubTab>("action");
   const startedAtRef = useRef<string>(new Date().toISOString());
 
+  // Dev time-travel: an offset added to the real clock, not a frozen instant --
+  // it keeps ticking naturally between clicks, each click just moves it further
+  // ahead. Threaded into every now/startedAt/completedAt the client sends,
+  // mirroring the server's own "time is explicit, not ambient" design
+  // (docs/spec/11-core-principle.md), which is exactly what makes this possible
+  // without a server change.
+  const [timeOffsetMs, setTimeOffsetMs] = useState(0);
+  const simulatedNow = useCallback(() => new Date(Date.now() + timeOffsetMs), [timeOffsetMs]);
+
   const loadNext = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const next = await getNextAction(userId);
+      const next = await getNextAction(userId, simulatedNow());
       setResponse(next);
-      startedAtRef.current = new Date().toISOString();
+      startedAtRef.current = simulatedNow().toISOString();
       setView("action");
       setCompletionPrefill(null);
       setExerciseSubTab("action");
@@ -40,11 +51,28 @@ export function AppShell({ userId }: { userId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, simulatedNow]);
 
   useEffect(() => {
     loadNext();
   }, [loadNext]);
+
+  // History (Overall tab): fetched once, the first time that tab is opened --
+  // not on mount (avoids fetching data the user may never look at), not on every
+  // tab switch back (avoids redundant refetches). Nothing else in AppShell
+  // prefetches a tab's data ahead of it becoming active either (Today reads off
+  // the already-loaded GET /next response), so this stays consistent with that.
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "overall" && !historyLoaded) {
+      getHistory(userId).then(({ history }) => {
+        setHistory(history);
+        setHistoryLoaded(true);
+      });
+    }
+  }, [activeTab, historyLoaded, userId]);
 
   async function handleSubmit(actual: ActualResult) {
     if (!response) return;
@@ -56,7 +84,7 @@ export function AppShell({ userId }: { userId: string }) {
         exerciseId: response.nextAction.exerciseId,
         timezone: currentTimezone(),
         startedAt: startedAtRef.current,
-        completedAt: new Date().toISOString(),
+        completedAt: simulatedNow().toISOString(),
         actual,
       });
       await loadNext();
@@ -101,6 +129,8 @@ export function AppShell({ userId }: { userId: string }) {
 
   return (
     <div className="app-shell">
+      <TimeTravelBar simulatedNow={simulatedNow()} onAdvance={(delta) => setTimeOffsetMs((prev) => prev + delta)} />
+
       <TabBar tabs={tabs} activeTab={activeTab} onChange={(id) => setActiveTab(id as TabId)} />
 
       {error && <p className="status-message status-message--error">{error}</p>}
@@ -222,9 +252,7 @@ export function AppShell({ userId }: { userId: string }) {
       </div>
 
       <div className="tab-panel" hidden={activeTab !== "overall"}>
-        <div className="placeholder-panel">
-          <p>Overall progress is coming soon.</p>
-        </div>
+        <HistoryList entries={history} />
       </div>
     </div>
   );

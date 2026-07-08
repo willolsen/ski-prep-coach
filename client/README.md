@@ -13,8 +13,8 @@ npm run dev
 
 Requires an API server at `VITE_API_BASE_URL` (see `.env`). Two options:
 
-- **Mock** (default, `http://localhost:3001`): `npm run mock:server` from the repo root. Random-exercise picker, in-memory only, reset on restart. Built purely so the client had something real to talk to before the real pipeline existed.
-- **Real**: `npm run dev` (Hono app, `src/app.ts`) from the repo root, default port 3000. **This already implements the full spec contract** — see "Mock → real swap" below for the two things it's still missing for browser use.
+- **Real** (default, `http://localhost:3000`): `npm run dev` (Hono app, `src/app.ts`) from the repo root. Requires local Postgres running and migrated/seeded (`npm run db:migrate && npm run db:seed` from the repo root, one-time / after schema changes). This is what the client is wired against now — see "Mock → real swap" below for what that took.
+- **Mock** (`http://localhost:3001`): `npm run mock:server` from the repo root. Random-exercise picker, in-memory only, reset on restart. Built purely so UI work could proceed before the real pipeline existed; still useful for UI-only iteration without a database.
 
 Switching backends is a one-line env var change (`client/.env`), not a code change — see why below.
 
@@ -31,18 +31,23 @@ client/src/
   styles.css                      — the entire stylesheet, one file, CSS custom properties for theming
 
   api/
-    types.ts                      — TypeScript types mirroring docs/spec/05-server-api.md exactly.
-                                     Keep these in sync with the SPEC, not with the mock server.
-    client.ts                     — fetch wrappers: getNextAction(), submitResult(), exerciseImageUrl().
-                                     Every network call in the app goes through this one file.
+    types.ts                      — TypeScript types mirroring docs/spec/05-server-api.md exactly
+                                     (plus HistoryEntry/HistoryResponse, which aren't part of the spec —
+                                     see below). Keep these in sync with the SPEC, not with the mock server.
+    client.ts                     — fetch wrappers: getNextAction(), submitResult(), getHistory(),
+                                     exerciseImageUrl(). Every network call in the app goes through this
+                                     one file.
 
   screens/
-    AppShell.tsx                  — THE state owner. Fetches on mount, holds view/tab state, renders
-                                     everything below. Start here to understand the app.
+    AppShell.tsx                  — THE state owner. Fetches on mount, holds view/tab state, the
+                                     dev time-travel clock offset, and renders everything below. Start
+                                     here to understand the app.
 
   components/
     TabBar.tsx                    — generic top-level tab nav (label + optional badge). Reused as-is
                                      for the Current Exercise / Today / Overall tabs.
+    TimeTravelBar.tsx             — dev-only "advance simulated time" controls (+30s / +1h), rendered
+                                     above TabBar so it's visible on every tab. Not part of the product.
     NextActionCard.tsx            — persistent exercise header (image, name, prescription summary).
                                      Also exports ExerciseFullImage (used in the Description sub-tab).
     ExerciseTimer.tsx             — countdown UI for duration-based exercises (holds, cardio). Owns its
@@ -57,6 +62,8 @@ client/src/
                                      across every state (Ready / Hold / Set N of M / Rest / Finish Up).
     StateSummary.tsx              — readiness/warmth/limiting-capability chips (Today tab)
     TodayProgress.tsx             — daily stimulus progress bar (Today tab)
+    HistoryList.tsx               — last-50-exercises list (Overall tab), grouped by the `date` the
+                                     server already derived per event; day separators, most-recent-first.
 
   audio.ts                        — one function, beep(), used for timer phase-change cues
   format.ts                       — one function, formatClock(), MM:SS formatting
@@ -83,22 +90,15 @@ Routing between `timer` / `sets` / `form` is decided once, from the prescription
 
 ## Mock → real swap
 
-The client was built directly against `docs/spec/05-server-api.md`'s request/response shapes (see `api/types.ts`), specifically so this swap is a config change, not a rewrite.
+The client was built directly against `docs/spec/05-server-api.md`'s request/response shapes (see `api/types.ts`), specifically so this swap would be a config change, not a rewrite — and it was: `client/.env` now points `VITE_API_BASE_URL` at the real server by default. What that took, for reference (all done, in `src/app.ts` unless noted):
 
-**1. Point at the real server.** In `client/.env`:
+**1. Point at the real server.** `client/.env`: `VITE_API_BASE_URL=http://localhost:3000`. `GET /next` and `POST /results` needed no server change at all — `src/pipeline/getNextAction.ts`'s response shape (`icon`, `completionQuestions`, `why`, etc.) already matched `api/types.ts` exactly.
 
-```diff
-- VITE_API_BASE_URL=http://localhost:3001
-+ VITE_API_BASE_URL=http://localhost:3000   # or wherever src/app.ts is deployed
-```
+**2. CORS.** `app.use("/api/*", cors())`, same as the mock (`scripts/mock-server.ts`) — a browser on `localhost:5173` calling a different-port API needs it, or every request fails with an opaque CORS error.
 
-That's it for `GET /next` and `POST /results` — `src/app.ts` already implements both against the real decision pipeline, with the same response shape the client expects (checked against `src/pipeline/getNextAction.ts` while writing this: `icon`, `completionQuestions`, `why` are all there).
+**3. Exercise images.** Ported the mock's `GET /exercise-images/:file` (serving from `data/generated-images/`) onto the real server as-is. `api/client.ts`'s `exerciseImageUrl()` needed no change — it already built the right URL, there was just nothing answering it.
 
-**2. Enable CORS on the real server.** The mock has `app.use("/api/*", cors())` (`scripts/mock-server.ts`) specifically because a browser on `localhost:5173` calling a different-port API needs it. `src/app.ts` doesn't have this yet — add it (`hono/cors`, same as the mock) before pointing the client at it, or every request will fail with an opaque CORS error, not a helpful one.
-
-**3. Exercise images have no real equivalent yet.** `api/client.ts`'s `exerciseImageUrl()` builds `{API_BASE_URL}/exercise-images/{exerciseId}.png` — a route that only exists on the mock (`scripts/mock-server.ts`, serving straight from `data/generated-images/`). This was never part of the spec (`docs/spec/05-server-api.md` has no image field). Options for the real server, roughly in order of effort: (a) add the same static-file route serving from wherever the real exercise images end up, (b) serve from a CDN/object storage and change `exerciseImageUrl()` to point there instead, (c) put a real `imageUrl` field on the spec's `nextAction` response and drop `exerciseImageUrl()`'s exerciseId-based URL construction entirely. `exerciseImageUrl()` is the only place this logic lives, so any of the three is a one-function change.
-
-**4. `POST /log` and `POST /readiness` are implemented server-side but the client never calls them.** Onboarding/self-directed logging and the morning readiness check-in have no UI yet — see "Not built" below. When you build that UI, the server work is already done; wire straight to it.
+**4. `POST /log` and `POST /readiness` are still implemented server-side but the client still never calls them.** Onboarding/self-directed logging and the morning readiness check-in still have no UI — see "Not built" below.
 
 ## What's mocked vs. real today
 
@@ -109,13 +109,13 @@ That's it for `GET /next` and `POST /results` — `src/app.ts` already implement
 | `POST /api/users/:id/log` | ✅ | ❌ | ❌ (no UI yet) |
 | `POST /api/users/:id/readiness` | ✅ | ❌ | ❌ (no UI yet) |
 | `GET /api/users/:id/state` (debug) | ✅ | ❌ | ❌ |
-| `GET /exercise-images/:file` | ❌ | ✅ | ✅ (not part of the spec — see above) |
+| `GET /api/users/:id/history` (last 50 exercises, not part of the spec) | ✅ | ❌ | ✅ (Overall tab) |
+| `GET /exercise-images/:file` (not part of the spec) | ✅ | ✅ | ✅ |
 
 ## Not built (by design — not silently dropped)
 
 - **Readiness check-in UI** for `POST /readiness` (morning pain/stiffness/sleep survey)
 - **Self-directed / onboarding logging UI** for `POST /log`
-- **Overall tab** is an intentional placeholder (`AppShell.tsx`, "Overall" tab panel) — no spec-defined "all-time progress" view exists yet to build against
 - Auth, multi-user, real persistence of anything client-side beyond the `localHistory.ts` "last weight/reps" cache (matches the spec's own stated gaps, `docs/spec/14-server-framework.md#known-gap-authentication`)
 
 A `todo.txt` at the repo root has additional rougher notes/ideas from working sessions (snooze an exercise, temporarily swap equipment, tips during rest, etc.) — not committed to, just captured so they're not lost.
