@@ -259,6 +259,26 @@ app.get("/api/users/:userId/next", (c) => {
   });
 });
 
+// Serves the AI-generated illustrations from data/generated-images/ so the
+// client can show a real image per exercise. Not part of the spec's API
+// contract (docs/spec/05-server-api.md has no image field) — the client
+// derives this URL itself from `exerciseId`, which the contract does provide,
+// so this stays a purely additive convenience rather than something the real
+// server is obligated to also implement the same way.
+app.get("/exercise-images/:file", async (c) => {
+  const file = c.req.param("file");
+  const id = file.replace(/\.png$/, "");
+  if (!/^[0-9a-zA-Z_-]+$/.test(id)) {
+    return c.notFound();
+  }
+  try {
+    const buffer = await readFile(path.join(repoRoot, "data", "generated-images", `${id}.png`));
+    return c.body(buffer, 200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" });
+  } catch {
+    return c.notFound();
+  }
+});
+
 app.post("/api/users/:userId/results", async (c) => {
   const userId = c.req.param("userId");
   const body = await c.req.json<{ recommendationId?: string; exerciseId?: string; actual?: unknown }>();

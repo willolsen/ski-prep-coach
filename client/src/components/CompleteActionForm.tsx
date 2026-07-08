@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ActualResult, Difficulty, NextAction } from "../api/types";
+import { FocusLabel } from "./FocusLabel";
 
 const DIFFICULTY_OPTIONS: Difficulty[] = ["too_easy", "easy", "normal", "hard", "too_hard"];
 
@@ -7,22 +8,36 @@ function difficultyLabel(value: Difficulty): string {
   return value.replace(/_/g, " ");
 }
 
+export interface CompletionPrefill {
+  setsCompleted?: number;
+  durationSecCompleted?: number;
+  repsCompleted?: number;
+  load?: string;
+}
+
 export function CompleteActionForm({
   action,
   submitting,
+  prefill,
   onSubmit,
   onCancel,
 }: {
   action: NextAction;
   submitting: boolean;
+  prefill?: CompletionPrefill;
   onSubmit: (actual: ActualResult) => void;
   onCancel: () => void;
 }) {
   const prescription = action.prescription;
 
-  const [setsCompleted, setSetsCompleted] = useState(prescription?.sets ?? 0);
-  const [repsCompleted, setRepsCompleted] = useState(prescription?.reps ?? 0);
-  const [durationSecCompleted, setDurationSecCompleted] = useState(prescription?.durationSec ?? 0);
+  const [setsCompleted, setSetsCompleted] = useState(prefill?.setsCompleted ?? prescription?.sets ?? 0);
+  const [repsCompleted, setRepsCompleted] = useState(prefill?.repsCompleted ?? prescription?.reps ?? 0);
+  const [durationSecCompleted, setDurationSecCompleted] = useState(
+    prefill?.durationSecCompleted ?? prescription?.durationSec ?? 0,
+  );
+  const [load, setLoad] = useState(prefill?.load ?? "");
+  const hasSetsPrefill = prefill?.setsCompleted !== undefined;
+  const hasRepsPrefill = prefill?.repsCompleted !== undefined;
   const [maxPain, setMaxPain] = useState(0);
   const [rpe, setRpe] = useState(prescription?.targetRpe ?? 5);
   const [difficulty, setDifficulty] = useState<Difficulty>("normal");
@@ -31,6 +46,7 @@ export function CompleteActionForm({
   if (action.type === "rest") {
     return (
       <div className="complete-form">
+        <FocusLabel text="Rest" variant="rest" />
         <p>No exercise to log — just acknowledging the rest recommendation.</p>
         <div className="complete-form__actions">
           <button
@@ -53,13 +69,29 @@ export function CompleteActionForm({
     if (prescription?.sets) actual.setsCompleted = setsCompleted;
     if (prescription?.reps) actual.repsCompleted = repsCompleted;
     if (prescription?.durationSec) actual.durationSecCompleted = durationSecCompleted;
+    if (load.trim()) actual.load = load.trim();
     if (notes.trim()) actual.notes = notes.trim();
     onSubmit(actual);
   }
 
   return (
     <form className="complete-form" onSubmit={handleSubmit}>
-      {prescription?.sets !== undefined && (
+      <FocusLabel text="Finish Up" />
+
+      {(hasSetsPrefill || hasRepsPrefill) && (
+        <p className="complete-form__recap">
+          {hasSetsPrefill && `${setsCompleted} set${setsCompleted === 1 ? "" : "s"} logged`}
+          {hasSetsPrefill && hasRepsPrefill && " · "}
+          {hasRepsPrefill && `last set: ${repsCompleted} reps`}
+          {hasRepsPrefill && load && ` @ ${load}`}
+        </p>
+      )}
+
+      {prefill?.durationSecCompleted !== undefined && (
+        <p className="complete-form__prefill-note">Duration filled in from the timer — adjust below if needed.</p>
+      )}
+
+      {prescription?.sets !== undefined && !hasSetsPrefill && (
         <label className="field">
           Sets completed
           <input
@@ -71,16 +103,28 @@ export function CompleteActionForm({
         </label>
       )}
 
-      {prescription?.reps !== undefined && (
-        <label className="field">
-          Reps completed (last set)
-          <input
-            type="number"
-            min={0}
-            value={repsCompleted}
-            onChange={(e) => setRepsCompleted(Number(e.target.value))}
-          />
-        </label>
+      {prescription?.reps !== undefined && !hasRepsPrefill && (
+        <>
+          <label className="field">
+            Reps completed (last set)
+            <input
+              type="number"
+              min={0}
+              value={repsCompleted}
+              onChange={(e) => setRepsCompleted(Number(e.target.value))}
+            />
+          </label>
+          <label className="field">
+            Weight/load (last set, optional)
+            <input
+              type="text"
+              inputMode="decimal"
+              value={load}
+              onChange={(e) => setLoad(e.target.value)}
+              placeholder="e.g. 135 lbs, bodyweight"
+            />
+          </label>
+        </>
       )}
 
       {prescription?.durationSec !== undefined && (

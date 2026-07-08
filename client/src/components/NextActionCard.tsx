@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { exerciseImageUrl } from "../api/client";
 import type { NextAction } from "../api/types";
 
 function formatDuration(seconds: number | null): string | undefined {
@@ -18,18 +20,61 @@ function formatPrescription(action: NextAction): string | undefined {
   return parts.join(" × ");
 }
 
-export function NextActionCard({ action }: { action: NextAction }) {
+function ExerciseThumbnail({ action }: { action: NextAction }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const isRest = action.type === "rest";
+  const fallbackIcon = action.icon ?? (isRest ? "🧘" : "🏔️");
+
+  if (isRest || !action.exerciseId || imageFailed) {
+    return (
+      <span className="next-action-card__icon" aria-hidden="true">
+        {fallbackIcon}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      className="next-action-card__thumbnail"
+      src={exerciseImageUrl(action.exerciseId)}
+      alt={action.title}
+      onError={() => setImageFailed(true)}
+    />
+  );
+}
+
+/** Full-width version of the exercise image, used in the Description sub-tab. */
+export function ExerciseFullImage({ action }: { action: NextAction }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  if (action.type === "rest" || !action.exerciseId || imageFailed) {
+    return null;
+  }
+
+  return (
+    <img
+      className="exercise-detail-panel__image"
+      src={exerciseImageUrl(action.exerciseId)}
+      alt={action.title}
+      onError={() => setImageFailed(true)}
+    />
+  );
+}
+
+/**
+ * Persistent header only — image/icon, name, and prescription summary. Stays
+ * visible no matter which of the Action / Description / Why sub-tabs (owned
+ * by AppShell) is currently selected.
+ */
+export function NextActionCard({ action }: { action: NextAction }) {
   const prescriptionSummary = formatPrescription(action);
   const duration = formatDuration(action.estimatedDurationSec);
 
   return (
-    <article className={`next-action-card ${isRest ? "next-action-card--rest" : ""}`}>
+    <article className="next-action-card">
       <div className="next-action-card__header">
-        <span className="next-action-card__icon" aria-hidden="true">
-          {action.icon ?? (isRest ? "🧘" : "🏔️")}
-        </span>
-        <div>
+        <ExerciseThumbnail action={action} />
+        <div className="next-action-card__heading">
           <h2>{action.title}</h2>
           {(prescriptionSummary || duration) && (
             <p className="next-action-card__meta">
@@ -40,25 +85,6 @@ export function NextActionCard({ action }: { action: NextAction }) {
           )}
         </div>
       </div>
-
-      {action.instructions.length > 0 && (
-        <ol className="next-action-card__instructions">
-          {action.instructions.map((step, i) => (
-            <li key={i}>{step}</li>
-          ))}
-        </ol>
-      )}
-
-      {action.why.length > 0 && (
-        <details className="next-action-card__why">
-          <summary>Why this?</summary>
-          <ul>
-            {action.why.map((reason, i) => (
-              <li key={i}>{reason}</li>
-            ))}
-          </ul>
-        </details>
-      )}
     </article>
   );
 }

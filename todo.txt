@@ -1,0 +1,20 @@
+progress time should be "emptying" rather than "filling" as the app counts down.
+pipeline and UI for adding exercises.
+
+-----------------
+
+different color on countdown for rest vs activity.
+show tips of form and technique during reset periods.
+
+panel that shows all of the intermediate state used in the calcuation
+ability to snooze an exercise
+ability to temporarily change equipment ( I am not at the gym )
+sign up and login system
+payment system
+suggest simple stretches or movements to do while resting.
+intelligently decide parameters for new exercises based on known capabilities in previous exerices.
+UI should show weight/set/reps from last time exercise was done.
+When resting, it should make it clear how long until the next exercise ( maybe have a countdown timer? )
+number should be on top of the sliders, and bigger, and be to the left of the label text.
+
+record partial progress into database.

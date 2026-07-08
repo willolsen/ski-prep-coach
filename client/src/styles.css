@@ -10,6 +10,8 @@
   --green: #16a34a;
   --yellow: #ca8a04;
   --red: #dc2626;
+  --rest-accent: #b45309;
+  --subtab-accent: #7c3aed;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +21,8 @@
     --text: #f2f3f5;
     --text-muted: #9aa0a8;
     --border: rgba(255, 255, 255, 0.14);
+    --rest-accent: #fbbf24;
+    --subtab-accent: #a78bfa;
   }
 }
 
@@ -66,6 +70,68 @@ body {
 
 .status-message--error {
   color: var(--red);
+}
+
+/* App shell / tabs */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-bar__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.65rem 0.4rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tab-bar__tab--active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.tab-bar__badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--bg);
+  color: inherit;
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+
+.placeholder-panel {
+  padding: 3rem 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
 }
 
 /* Today progress */
@@ -134,27 +200,31 @@ body {
 }
 
 /* Next action card */
-.next-action-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.25rem;
-}
-
-.next-action-card--rest {
-  background: linear-gradient(180deg, var(--surface), transparent 150%);
-}
-
 .next-action-card__header {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  margin-bottom: 0.75rem;
+}
+
+.next-action-card__heading {
+  flex: 1;
+  min-width: 0;
 }
 
 .next-action-card__icon {
   font-size: 2rem;
   line-height: 1;
+  flex-shrink: 0;
+}
+
+.next-action-card__thumbnail {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--bg);
+  border: 1px solid var(--border);
 }
 
 .next-action-card__header h2 {
@@ -168,8 +238,47 @@ body {
   font-size: 0.85rem;
 }
 
+/* Exercise sub-tabs: Action / Description / Why, within the Current Exercise tab */
+.exercise-subtabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.exercise-subtab {
+  flex: 1;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.55rem 0.4rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.exercise-subtab--active {
+  color: var(--subtab-accent);
+  border-bottom-color: var(--subtab-accent);
+}
+
+.exercise-detail-panel {
+  padding: 0.25rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.exercise-detail-panel__image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+}
+
 .next-action-card__instructions {
-  margin: 0 0 0.75rem;
+  margin: 0;
   padding-left: 1.25rem;
 }
 
@@ -177,17 +286,15 @@ body {
   margin-bottom: 0.4rem;
 }
 
-.next-action-card__why summary {
-  cursor: pointer;
-  color: var(--primary);
-  font-size: 0.9rem;
-}
-
-.next-action-card__why ul {
-  margin: 0.5rem 0 0;
+.next-action-card__why-list {
+  margin: 0;
   padding-left: 1.25rem;
   color: var(--text-muted);
   font-size: 0.9rem;
+}
+
+.next-action-card__why-list li {
+  margin-bottom: 0.4rem;
 }
 
 /* Buttons */
@@ -219,12 +326,178 @@ body {
   cursor: default;
 }
 
+/*
+ * Focus label — the one fixed place in the UI that always answers "what should
+ * I be doing right now." Same typography and same position (top of whichever
+ * panel is active below the exercise card) in every state: ready-to-start,
+ * mid-set, resting, or wrapping up, so the user always looks in one spot.
+ */
+.focus-label {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.focus-label--rest {
+  color: var(--rest-accent);
+}
+
+/* Action prompt (before starting) */
+.action-prompt {
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Exercise timer */
+.exercise-timer {
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.exercise-timer__clock-wrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.exercise-timer__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* rotate(-90deg) alone gives a counter-clockwise sweep anchored at 12.
+     scaleX(-1) alone flips the sweep to clockwise, but anchors it at 9 instead.
+     This combination is what's needed to get a clockwise sweep anchored at 12. */
+  transform: rotate(90deg) scaleX(-1);
+}
+
+.exercise-timer__ring-track,
+.exercise-timer__ring-fill {
+  fill: none;
+  stroke-width: 8;
+}
+
+.exercise-timer__ring-track {
+  stroke: var(--border);
+}
+
+.exercise-timer__ring-fill {
+  stroke: var(--primary);
+  stroke-linecap: round;
+  stroke-dasharray: 339.3;
+  /* No CSS transition — the ring is now driven every animation frame in JS
+     (requestAnimationFrame), so a transition here would just add lag on top
+     of already-smooth per-frame updates. */
+}
+
+.exercise-timer__clock {
+  font-size: 2.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.exercise-timer__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.exercise-timer__controls .button--large {
+  width: auto;
+  min-width: 60%;
+}
+
+/* Set logger */
+.set-logger {
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.set-logger__hint {
+  margin: -0.5rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.set-logger__history {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.set-logger__history li {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 0.4rem 0.65rem;
+}
+
+.set-logger__inputs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.set-logger__inputs .field {
+  flex: 1;
+}
+
+.set-logger__controls {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.set-logger__controls .button--large {
+  flex: 1;
+}
+
+.set-logger__finish-early {
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 /* Complete form */
+.complete-form__prefill-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.complete-form__recap {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .complete-form {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.25rem;
+  padding: 0.5rem 0;
   display: flex;
   flex-direction: column;
   gap: 1rem;
