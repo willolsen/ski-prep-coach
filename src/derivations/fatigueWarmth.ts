@@ -48,7 +48,7 @@ export async function getAggregateFatigue(userId: string, now: Date, pool: Query
   return buckets.reduce((max, b) => Math.max(max, b.bucketFatigue), 0);
 }
 
-const MOVEMENT_PATTERNS = ["squat", "hinge", "lunge", "push", "pull", "rotation", "gait_locomotion"] as const;
+export const MOVEMENT_PATTERNS = ["squat", "hinge", "lunge", "push", "pull", "rotation", "gait_locomotion"] as const;
 
 export interface Warmth {
   general: number;
