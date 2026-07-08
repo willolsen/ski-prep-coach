@@ -57,13 +57,12 @@ export function AppShell({ userId }: { userId: string }) {
     loadNext();
   }, [loadNext]);
 
-  // History (Overall tab): fetched once, the first time that tab is opened --
-  // not on mount (avoids fetching data the user may never look at), not on every
-  // tab switch back (avoids redundant refetches). Nothing else in AppShell
-  // prefetches a tab's data ahead of it becoming active either (Today reads off
-  // the already-loaded GET /next response), so this stays consistent with that.
+  // History (Overall tab): refetched every time the tab becomes active, not
+  // just on its first visit -- the user may have logged an exercise since the
+  // last time they looked. Not fetched on mount, matching the rest of
+  // AppShell's no-prefetch pattern (Today reads off the already-loaded
+  // GET /next response rather than fetching separately).
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   const loadHistory = useCallback(async () => {
@@ -71,7 +70,6 @@ export function AppShell({ userId }: { userId: string }) {
     try {
       const { history } = await getHistory(userId);
       setHistory(history);
-      setHistoryLoaded(true);
     } catch (err) {
       // Previously silent -- a failed fetch left the Overall tab showing an
       // empty list with no indication anything went wrong.
@@ -80,10 +78,10 @@ export function AppShell({ userId }: { userId: string }) {
   }, [userId]);
 
   useEffect(() => {
-    if (activeTab === "overall" && !historyLoaded && !historyError) {
+    if (activeTab === "overall") {
       loadHistory();
     }
-  }, [activeTab, historyLoaded, historyError, loadHistory]);
+  }, [activeTab, loadHistory]);
 
   async function handleSubmit(actual: ActualResult) {
     if (!response) return;
