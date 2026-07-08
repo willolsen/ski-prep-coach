@@ -45,7 +45,7 @@ test("computeReadinessStatus: yellow when aggregateFatigue is 60 or higher", () 
 test("submitReadiness derives date from (now, timezone) and stores computedStatus", async () => {
   await withTransaction(async (db) => {
     const result = await submitReadiness(
-      "user-001",
+      "user-test-fixture",
       {
         now: "2026-07-10T07:30:00-07:00",
         timezone: "America/Los_Angeles",
@@ -62,7 +62,7 @@ test("submitReadiness derives date from (now, timezone) and stores computedStatu
     assert.equal(result.computedStatus, "green");
 
     const { rows } = await db.query<{ computed_status: string; entry: { painNow: number } }>(
-      `SELECT computed_status, entry FROM readiness_entries WHERE user_id = 'user-001' AND date = '2026-07-10'`,
+      `SELECT computed_status, entry FROM readiness_entries WHERE user_id = 'user-test-fixture' AND date = '2026-07-10'`,
     );
     assert.equal(rows[0]!.computed_status, "green");
     assert.equal(rows[0]!.entry.painNow, 1);
@@ -82,7 +82,7 @@ test("submitReadiness reflects aggregateFatigue computed fresh as of the submitt
     }
 
     const result = await submitReadiness(
-      "user-001",
+      "user-test-fixture",
       {
         now: now.toISOString(),
         timezone: "UTC",
@@ -102,7 +102,7 @@ test("submitReadiness reflects aggregateFatigue computed fresh as of the submitt
 test("submitting again for the same derived date overwrites the previous entry", async () => {
   await withTransaction(async (db) => {
     await submitReadiness(
-      "user-001",
+      "user-test-fixture",
       {
         now: "2026-07-10T07:00:00Z",
         timezone: "UTC",
@@ -116,7 +116,7 @@ test("submitting again for the same derived date overwrites the previous entry",
     );
 
     const second = await submitReadiness(
-      "user-001",
+      "user-test-fixture",
       {
         now: "2026-07-10T18:00:00Z",
         timezone: "UTC",
@@ -132,7 +132,7 @@ test("submitting again for the same derived date overwrites the previous entry",
     assert.equal(second.date, "2026-07-10");
     assert.equal(second.computedStatus, "red");
 
-    const { rows } = await db.query(`SELECT count(*) AS count FROM readiness_entries WHERE user_id = 'user-001'`);
+    const { rows } = await db.query(`SELECT count(*) AS count FROM readiness_entries WHERE user_id = 'user-test-fixture'`);
     assert.equal(rows[0]!.count, 1);
   });
 });

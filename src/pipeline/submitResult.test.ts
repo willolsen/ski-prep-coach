@@ -11,7 +11,7 @@ test("stores an exercise_result event and clears the pending recommendation", as
   await withTransaction(async (db) => {
     const recommendationId = randomUUID();
     await setPendingRecommendation(
-      "user-001",
+      "user-test-fixture",
       recommendationId,
       {
         type: "exercise",
@@ -24,7 +24,7 @@ test("stores an exercise_result event and clears the pending recommendation", as
     );
 
     const outcome = await submitResult(
-      "user-001",
+      "user-test-fixture",
       {
         recommendationId,
         exerciseId: "wall_sit",
@@ -45,7 +45,7 @@ test("stores an exercise_result event and clears the pending recommendation", as
       dose_ratio: number;
       clean_completion: boolean;
       prescribed: unknown;
-    }>(`SELECT type, exercise_id, dose_ratio, clean_completion, prescribed FROM events WHERE user_id = 'user-001'`);
+    }>(`SELECT type, exercise_id, dose_ratio, clean_completion, prescribed FROM events WHERE user_id = 'user-test-fixture'`);
 
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.type, "exercise_result");
@@ -54,7 +54,7 @@ test("stores an exercise_result event and clears the pending recommendation", as
     assert.equal(rows[0]!.clean_completion, true);
     assert.deepEqual(rows[0]!.prescribed, { sets: 3, durationSec: 30, painLimit: 3, targetRpe: 5 });
 
-    const pending = await getPendingRecommendation("user-001", NOW, db);
+    const pending = await getPendingRecommendation("user-test-fixture", NOW, db);
     assert.equal(pending, null);
   });
 });
@@ -63,7 +63,7 @@ test("stores a rest event with dose_ratio 1.0 and clean_completion true", async 
   await withTransaction(async (db) => {
     const recommendationId = randomUUID();
     await setPendingRecommendation(
-      "user-001",
+      "user-test-fixture",
       recommendationId,
       { type: "rest", recommendationId, title: "Rest Is the Best Next Action" },
       NOW,
@@ -71,7 +71,7 @@ test("stores a rest event with dose_ratio 1.0 and clean_completion true", async 
     );
 
     const outcome = await submitResult(
-      "user-001",
+      "user-test-fixture",
       {
         recommendationId,
         timezone: "America/Los_Angeles",
@@ -85,7 +85,7 @@ test("stores a rest event with dose_ratio 1.0 and clean_completion true", async 
     assert.equal(outcome.ok, true);
 
     const { rows } = await db.query<{ type: string; exercise_id: string | null; dose_ratio: number; clean_completion: boolean }>(
-      `SELECT type, exercise_id, dose_ratio, clean_completion FROM events WHERE user_id = 'user-001'`,
+      `SELECT type, exercise_id, dose_ratio, clean_completion FROM events WHERE user_id = 'user-test-fixture'`,
     );
 
     assert.equal(rows[0]!.type, "rest");
@@ -99,7 +99,7 @@ test("computes a reduced dose_ratio and clean_completion false when the dose fel
   await withTransaction(async (db) => {
     const recommendationId = randomUUID();
     await setPendingRecommendation(
-      "user-001",
+      "user-test-fixture",
       recommendationId,
       {
         type: "exercise",
@@ -112,7 +112,7 @@ test("computes a reduced dose_ratio and clean_completion false when the dose fel
     );
 
     const outcome = await submitResult(
-      "user-001",
+      "user-test-fixture",
       {
         recommendationId,
         exerciseId: "wall_sit",
@@ -127,7 +127,7 @@ test("computes a reduced dose_ratio and clean_completion false when the dose fel
     assert.equal(outcome.ok, true);
 
     const { rows } = await db.query<{ dose_ratio: number; clean_completion: boolean }>(
-      `SELECT dose_ratio, clean_completion FROM events WHERE user_id = 'user-001'`,
+      `SELECT dose_ratio, clean_completion FROM events WHERE user_id = 'user-test-fixture'`,
     );
 
     assert.equal(rows[0]!.dose_ratio, 0.5);
@@ -138,7 +138,7 @@ test("computes a reduced dose_ratio and clean_completion false when the dose fel
 test("returns an error when there's no matching pending recommendation", async () => {
   await withTransaction(async (db) => {
     const outcome = await submitResult(
-      "user-001",
+      "user-test-fixture",
       {
         recommendationId: randomUUID(),
         exerciseId: "wall_sit",
@@ -153,7 +153,7 @@ test("returns an error when there's no matching pending recommendation", async (
     assert.equal(outcome.ok, false);
     assert.ok(!outcome.ok && outcome.status === 409);
 
-    const { rows } = await db.query(`SELECT 1 FROM events WHERE user_id = 'user-001'`);
+    const { rows } = await db.query(`SELECT 1 FROM events WHERE user_id = 'user-test-fixture'`);
     assert.equal(rows.length, 0);
   });
 });
@@ -162,7 +162,7 @@ test("returns an error when recommendationId doesn't match the currently pinned 
   await withTransaction(async (db) => {
     const pinnedId = randomUUID();
     await setPendingRecommendation(
-      "user-001",
+      "user-test-fixture",
       pinnedId,
       { type: "exercise", recommendationId: pinnedId, exerciseId: "wall_sit", prescription: null },
       NOW,
@@ -170,7 +170,7 @@ test("returns an error when recommendationId doesn't match the currently pinned 
     );
 
     const outcome = await submitResult(
-      "user-001",
+      "user-test-fixture",
       {
         recommendationId: randomUUID(),
         exerciseId: "wall_sit",

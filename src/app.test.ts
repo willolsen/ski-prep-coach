@@ -4,6 +4,12 @@
  * transactions -- these tests are thin smoke tests of the route wiring itself, run
  * against the real shared pool (no transaction available at the HTTP layer), so
  * whatever they create is explicitly cleaned up afterward rather than rolled back.
+ *
+ * Uses its own dedicated, permanently-seeded user (db/seed-data/users.json's
+ * "user-http-test"), not user-001 (that's the real app user, now in real use) and
+ * not user-test-fixture (reserved for the rest of the suite's purely-transactional
+ * tests) -- this file's real, briefly-committed writes would otherwise be a
+ * collision risk against either.
  */
 
 import { test } from "node:test";
@@ -13,7 +19,7 @@ import { getPool } from "./db.js";
 import { clearPendingRecommendation } from "./derivations/pendingRecommendation.js";
 
 test("GET /next without timezone returns 400", async () => {
-  const res = await app.request("/api/users/user-001/next");
+  const res = await app.request("/api/users/user-http-test/next");
   assert.equal(res.status, 400);
 });
 
@@ -24,7 +30,7 @@ test("GET /next returns 404 for an unknown user", async () => {
 
 test("GET /next with timezone returns a real recommendation for a known user", async () => {
   try {
-    const res = await app.request("/api/users/user-001/next?timezone=UTC");
+    const res = await app.request("/api/users/user-http-test/next?timezone=UTC");
     const body = (await res.json()) as {
       nextAction: { type: string; recommendationId: string };
       todayProgress: unknown;
@@ -37,12 +43,12 @@ test("GET /next with timezone returns a real recommendation for a known user", a
     assert.ok(body.todayProgress);
     assert.ok(body.stateSummary);
   } finally {
-    await clearPendingRecommendation("user-001");
+    await clearPendingRecommendation("user-http-test");
   }
 });
 
 test("GET /state without timezone returns 400", async () => {
-  const res = await app.request("/api/users/user-001/state");
+  const res = await app.request("/api/users/user-http-test/state");
   assert.equal(res.status, 400);
 });
 
@@ -52,7 +58,7 @@ test("GET /state returns 404 for an unknown user", async () => {
 });
 
 test("GET /state returns the full computed state without creating a pending recommendation", async () => {
-  const res = await app.request("/api/users/user-001/state?timezone=UTC");
+  const res = await app.request("/api/users/user-http-test/state?timezone=UTC");
   const body = (await res.json()) as {
     capabilities: unknown;
     fatigue: unknown;
@@ -75,12 +81,12 @@ test("GET /state returns the full computed state without creating a pending reco
 
 test("POST /results stores an event when it resolves the currently pinned recommendation", async () => {
   const now = new Date();
-  const nextRes = await app.request("/api/users/user-001/next?timezone=UTC");
+  const nextRes = await app.request("/api/users/user-http-test/next?timezone=UTC");
   const nextBody = (await nextRes.json()) as { nextAction: { recommendationId: string; exerciseId?: string } };
 
   let eventId: string | undefined;
   try {
-    const res = await app.request("/api/users/user-001/results", {
+    const res = await app.request("/api/users/user-http-test/results", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -100,12 +106,12 @@ test("POST /results stores an event when it resolves the currently pinned recomm
     eventId = body.eventId;
   } finally {
     if (eventId) await getPool().query("DELETE FROM events WHERE event_id = $1", [eventId]);
-    await clearPendingRecommendation("user-001");
+    await clearPendingRecommendation("user-http-test");
   }
 });
 
 test("POST /results returns 409 when there's no matching pending recommendation", async () => {
-  const res = await app.request("/api/users/user-001/results", {
+  const res = await app.request("/api/users/user-http-test/results", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -124,7 +130,7 @@ test("POST /results returns 409 when there's no matching pending recommendation"
 test("POST /log stores one event per entry", async () => {
   let eventIds: string[] = [];
   try {
-    const res = await app.request("/api/users/user-001/log", {
+    const res = await app.request("/api/users/user-http-test/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -152,7 +158,7 @@ test("POST /log stores one event per entry", async () => {
 
 test("POST /readiness stores a real entry and returns its derived date and computedStatus", async () => {
   try {
-    const res = await app.request("/api/users/user-001/readiness", {
+    const res = await app.request("/api/users/user-http-test/readiness", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -171,6 +177,6 @@ test("POST /readiness stores a real entry and returns its derived date and compu
     assert.equal(body.date, "2026-07-10");
     assert.equal(body.computedStatus, "green");
   } finally {
-    await getPool().query("DELETE FROM readiness_entries WHERE user_id = 'user-001' AND date = '2026-07-10'");
+    await getPool().query("DELETE FROM readiness_entries WHERE user_id = 'user-http-test' AND date = '2026-07-10'");
   }
 });

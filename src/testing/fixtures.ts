@@ -1,6 +1,11 @@
 /**
  * Test-only helpers for inserting events (docs/spec/04-history-and-readiness.md#user-activity-history)
  * and readiness entries (docs/spec/04-history-and-readiness.md#readiness-state).
+ *
+ * Default userId is "user-test-fixture" (db/seed-data/users.json), the shared
+ * fixture user reserved for this suite's purely-transactional tests -- not
+ * "user-001", which is the real app user and (now that it's in real use) no
+ * longer has an empty event history to assume.
  */
 
 import type { Queryable } from "../db.js";
@@ -18,7 +23,7 @@ export interface EventFixture {
 
 export async function insertExerciseResultEvent(db: Queryable, fixture: EventFixture): Promise<void> {
   const {
-    userId = "user-001",
+    userId = "user-test-fixture",
     exerciseId,
     timezone = "UTC",
     completedAt,
@@ -64,7 +69,7 @@ export interface ReadinessFixture {
 
 export async function insertReadinessEntry(db: Queryable, fixture: ReadinessFixture): Promise<void> {
   const {
-    userId = "user-001",
+    userId = "user-test-fixture",
     date,
     painNow = 0,
     morningStiffness = "none",

@@ -9,7 +9,7 @@ import { insertExerciseResultEvent } from "../testing/fixtures.js";
 
 test("recovery status with no history is eligible with zero counts", async () => {
   await withTransaction(async (db) => {
-    const status = await getRecoveryStatus("user-001", "push", "light", new Date(), db);
+    const status = await getRecoveryStatus("user-test-fixture", "push", "light", new Date(), db);
 
     assert.equal(status.lastDoneAt, null);
     assert.equal(status.todayCount, 0);
@@ -23,7 +23,7 @@ test("ineligible while within minRestHours of the last event", async () => {
     const now = new Date();
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: new Date(now.getTime() - 3_600_000) });
 
-    const status = await getRecoveryStatus("user-001", "squat", "moderate", now, db);
+    const status = await getRecoveryStatus("user-test-fixture", "squat", "moderate", now, db);
 
     assert.equal(status.eligible, false);
   });
@@ -45,7 +45,7 @@ test("ineligible once weekly count reaches maxPerWeek, even with rest and daily 
       completedAt: new Date(now.getTime() - 60 * 3_600_000),
     });
 
-    const status = await getRecoveryStatus("user-001", "hinge", "heavy_strength", now, db);
+    const status = await getRecoveryStatus("user-test-fixture", "hinge", "heavy_strength", now, db);
 
     assert.equal(status.todayCount, 0);
     assert.equal(status.weekCount, 3);
@@ -63,7 +63,7 @@ test("pain risk is elevated when the most recent event's maxPain exceeds its own
       cleanCompletion: false,
     });
 
-    const risk = await getPainRisk("user-001", ["wall_sit"], db);
+    const risk = await getPainRisk("user-test-fixture", ["wall_sit"], db);
 
     assert.equal(risk.elevatedRisk, true);
     assert.equal(risk.mostRecentEvent?.exerciseId, "wall_sit");
@@ -72,7 +72,7 @@ test("pain risk is elevated when the most recent event's maxPain exceeds its own
 
 test("pain risk is false with no matching history", async () => {
   await withTransaction(async (db) => {
-    const risk = await getPainRisk("user-001", ["wall_sit"], db);
+    const risk = await getPainRisk("user-test-fixture", ["wall_sit"], db);
 
     assert.equal(risk.elevatedRisk, false);
     assert.equal(risk.mostRecentEvent, null);
@@ -92,7 +92,7 @@ test("daily progress respects the (now, timezone) calendar-day boundary", async 
       completedAt: "2026-07-02T00:05:00Z", // today
     });
 
-    const progress = await getDailyProgress("user-001", "UTC", new Date("2026-07-02T08:00:00Z"), db);
+    const progress = await getDailyProgress("user-test-fixture", "UTC", new Date("2026-07-02T08:00:00Z"), db);
 
     // Only the "today" event should count -- if the boundary were off by one, this would double.
     assert.equal(progress.capabilityStimulus.knee_capacity, 7);
@@ -111,7 +111,7 @@ test("variation history returns only events within the requested day window, mos
       completedAt: new Date(now.getTime() - 10 * 86_400_000),
     });
 
-    const history = await getVariationHistory("user-001", 5, now, db);
+    const history = await getVariationHistory("user-test-fixture", 5, now, db);
 
     assert.deepEqual(
       history.map((e) => e.exerciseId),

@@ -22,7 +22,7 @@ test("uses the regression when the candidate is flagged elevatedRisk and a regre
     });
     const candidate = (await getExercise("spanish_squat", db))!;
 
-    const selection = await applyVariationRules("user-001", "UTC", NOW, candidate, db);
+    const selection = await applyVariationRules("user-test-fixture", "UTC", NOW, candidate, db);
 
     assert.equal(selection.exerciseId, "wall_sit");
     assert.equal(selection.reason, "elevated_risk_use_regression");
@@ -34,7 +34,7 @@ test("uses the regression on a yellow readiness day", async () => {
     await insertReadinessEntry(db, { date: TODAY, painNow: 2, computedStatus: "yellow" });
     const candidate = (await getExercise("spanish_squat", db))!;
 
-    const selection = await applyVariationRules("user-001", "UTC", NOW, candidate, db);
+    const selection = await applyVariationRules("user-test-fixture", "UTC", NOW, candidate, db);
 
     assert.equal(selection.exerciseId, "wall_sit");
     assert.equal(selection.reason, "low_readiness_use_regression");
@@ -50,7 +50,7 @@ test("uses the regression when warmth is only barely above its required threshol
     await insertExerciseResultEvent(db, { exerciseId: "spanish_squat", completedAt: eightMinutesAgo });
     const candidate = (await getExercise("spanish_squat", db))!;
 
-    const selection = await applyVariationRules("user-001", "UTC", NOW, candidate, db);
+    const selection = await applyVariationRules("user-test-fixture", "UTC", NOW, candidate, db);
 
     assert.equal(selection.exerciseId, "wall_sit");
     assert.equal(selection.reason, "low_warmth_use_regression");
@@ -66,7 +66,7 @@ test("keeps the candidate when nothing warrants variation", async () => {
     await insertExerciseResultEvent(db, { exerciseId: "spanish_squat", completedAt: oneMinuteAgo });
     const candidate = (await getExercise("spanish_squat", db))!;
 
-    const selection = await applyVariationRules("user-001", "UTC", NOW, candidate, db);
+    const selection = await applyVariationRules("user-test-fixture", "UTC", NOW, candidate, db);
 
     assert.equal(selection.exerciseId, "spanish_squat");
     assert.equal(selection.reason, "no_variation_needed");
@@ -86,7 +86,7 @@ test("uses the progression when the exercise's most recent result was easy and l
     });
     const candidate = (await getExercise("wall_sit", db))!;
 
-    const selection = await applyVariationRules("user-001", "UTC", NOW, candidate, db);
+    const selection = await applyVariationRules("user-test-fixture", "UTC", NOW, candidate, db);
 
     assert.equal(selection.exerciseId, "spanish_squat");
     assert.equal(selection.reason, "recent_results_justify_progression");

@@ -18,7 +18,7 @@ function findResult(results: Awaited<ReturnType<typeof generateCandidates>>, exe
 test("a fully clean cold-start exercise is eligible with no reason codes", async () => {
   await withTransaction(async (db) => {
     // ninety_ninety_hip_switch: rotation/daily, body only, zero warmth requirements.
-    const results = await generateCandidates("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
     const result = findResult(results, "ninety_ninety_hip_switch");
 
     assert.equal(result.eligible, true);
@@ -29,7 +29,7 @@ test("a fully clean cold-start exercise is eligible with no reason codes", async
 test("excludes an exercise when the user is missing its required equipment", async () => {
   await withTransaction(async (db) => {
     const profile: CandidateProfile = { availableEquipment: [], movementPatternRestrictions: {} };
-    const results = await generateCandidates("user-001", "UTC", NOW, profile, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, profile, db);
 
     // barbell_back_squat requires "barbell", which this profile doesn't have.
     assert.ok(findResult(results, "barbell_back_squat").reasonCodes.includes("missing_equipment"));
@@ -44,7 +44,7 @@ test("excludes an exercise whose movementPattern is restricted to avoid", async 
       availableEquipment: ["gym"],
       movementPatternRestrictions: { squat: "avoid" },
     };
-    const results = await generateCandidates("user-001", "UTC", NOW, profile, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, profile, db);
 
     assert.ok(findResult(results, "wall_sit").reasonCodes.includes("movement_pattern_avoided"));
     assert.ok(!findResult(results, "ninety_ninety_hip_switch").reasonCodes.includes("movement_pattern_avoided"));
@@ -57,7 +57,7 @@ test("a mild restriction excludes non-daily/light recovery classes but not daily
       availableEquipment: ["gym"],
       movementPatternRestrictions: { squat: "mild" },
     };
-    const results = await generateCandidates("user-001", "UTC", NOW, profile, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, profile, db);
 
     // wall_sit is squat/moderate -- excluded under "mild".
     assert.ok(findResult(results, "wall_sit").reasonCodes.includes("movement_pattern_mild_restriction"));
@@ -69,7 +69,7 @@ test("a mild restriction excludes non-daily/light recovery classes but not daily
 test("excludes an exercise when warmth is insufficient", async () => {
   await withTransaction(async (db) => {
     // No warm-up events at all -- wall_sit requires generalWarmthRequired 10, movementPatternWarmthRequired 15.
-    const results = await generateCandidates("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.ok(findResult(results, "wall_sit").reasonCodes.includes("not_warm_enough"));
   });
@@ -79,7 +79,7 @@ test("excludes an exercise when its recovery bucket is not eligible", async () =
   await withTransaction(async (db) => {
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: new Date(NOW.getTime() - 3_600_000) });
 
-    const results = await generateCandidates("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     // squat/moderate minRestHours is 24; only 1 hour has passed.
     assert.ok(findResult(results, "wall_sit").reasonCodes.includes("recovery_not_eligible"));
@@ -97,7 +97,7 @@ test("excludes an exercise once all its trained capabilities have already met ta
       doseRatio: 500,
     });
 
-    const results = await generateCandidates("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.ok(findResult(results, "wall_sit").reasonCodes.includes("capability_targets_already_met"));
   });
@@ -107,7 +107,7 @@ test("excludes everything when today's readiness is red", async () => {
   await withTransaction(async (db) => {
     await insertReadinessEntry(db, { date: TODAY, painNow: 5, computedStatus: "red" });
 
-    const results = await generateCandidates("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.ok(findResult(results, "ninety_ninety_hip_switch").reasonCodes.includes("readiness_red"));
   });
@@ -124,7 +124,7 @@ test("excludes an elevated-risk exercise when it has no eligible regression", as
       cleanCompletion: false,
     });
 
-    const results = await generateCandidates("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.ok(findResult(results, "wall_sit").reasonCodes.includes("elevated_risk_no_regression"));
   });
@@ -141,7 +141,7 @@ test("does not exclude an elevated-risk exercise for that reason when a regressi
       cleanCompletion: false,
     });
 
-    const results = await generateCandidates("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const results = await generateCandidates("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.ok(!findResult(results, "spanish_squat").reasonCodes.includes("elevated_risk_no_regression"));
   });

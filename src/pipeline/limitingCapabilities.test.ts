@@ -14,7 +14,7 @@ import { insertExerciseResultEvent } from "../testing/fixtures.js";
 
 test("on a cold start, the highest target*priority capability ranks first and the lowest ranks last", async () => {
   await withTransaction(async (db) => {
-    const result = await identifyLimitingCapabilities("user-001", new Date(), db);
+    const result = await identifyLimitingCapabilities("user-test-fixture", new Date(), db);
 
     assert.equal(result.ranked[0]!.capabilityId, "knee_capacity");
     assert.equal(result.ranked[result.ranked.length - 1]!.capabilityId, "upper_body_strength");
@@ -24,7 +24,7 @@ test("on a cold start, the highest target*priority capability ranks first and th
 
 test("exactly 3 capabilities are flagged as limiting", async () => {
   await withTransaction(async (db) => {
-    const result = await identifyLimitingCapabilities("user-001", new Date(), db);
+    const result = await identifyLimitingCapabilities("user-test-fixture", new Date(), db);
 
     assert.equal(result.limitingCapabilityIds.size, 3);
     assert.ok(result.limitingCapabilityIds.has("knee_capacity"));
@@ -44,7 +44,7 @@ test("the undertrained boost can push a capability above one that would otherwis
       actual: { maxPain: 5, difficulty: "too_hard" },
     });
 
-    const result = await identifyLimitingCapabilities("user-001", now, db);
+    const result = await identifyLimitingCapabilities("user-test-fixture", now, db);
 
     // knee_capacity (raw 75) was just touched, so it isn't boosted; balance (raw 63,
     // untouched) gets the undertrained boost and should now outrank it: 63 * 1.2 = 75.6 > 75.

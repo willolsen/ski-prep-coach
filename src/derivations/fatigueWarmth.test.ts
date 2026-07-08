@@ -22,7 +22,7 @@ test("fatigue is exactly halved after one half-life", async () => {
       completedAt: new Date(now.getTime() - 36 * 3_600_000),
     });
 
-    const buckets = await getBucketFatigue("user-001", now, db);
+    const buckets = await getBucketFatigue("user-test-fixture", now, db);
 
     assert.equal(buckets.length, 1);
     assertClose(buckets[0]!.bucketFatigue, 6, 1e-4);
@@ -36,7 +36,7 @@ test("separate (movementPattern, recoveryClass) buckets don't cross-contaminate"
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: oneHourAgo });
     await insertExerciseResultEvent(db, { exerciseId: "eccentric_step_down", completedAt: oneHourAgo });
 
-    const buckets = await getBucketFatigue("user-001", now, db);
+    const buckets = await getBucketFatigue("user-test-fixture", now, db);
     const squat = buckets.find((b) => b.movementPattern === "squat");
     const lunge = buckets.find((b) => b.movementPattern === "lunge");
 
@@ -53,7 +53,7 @@ test("aggregateFatigue is the max bucket, not the sum across buckets", async () 
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: oneHourAgo });
     await insertExerciseResultEvent(db, { exerciseId: "eccentric_step_down", completedAt: oneHourAgo });
 
-    const aggregate = await getAggregateFatigue("user-001", now, db);
+    const aggregate = await getAggregateFatigue("user-test-fixture", now, db);
 
     assertClose(aggregate, 16 * decay(1, 36), 1e-4);
   });
@@ -68,7 +68,7 @@ test("warmth excludes events older than the 3-hour window", async () => {
       completedAt: new Date(now.getTime() - 4 * 3_600_000),
     });
 
-    const warmth = await getWarmth("user-001", now, db);
+    const warmth = await getWarmth("user-test-fixture", now, db);
 
     // Only the 1-hour-old wall_sit event should contribute.
     assertClose(warmth.general, 12 * decay(60, 20), 1e-3);
@@ -82,7 +82,7 @@ test("warmth splits correctly across movement patterns", async () => {
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: oneHourAgo });
     await insertExerciseResultEvent(db, { exerciseId: "eccentric_step_down", completedAt: oneHourAgo });
 
-    const warmth = await getWarmth("user-001", now, db);
+    const warmth = await getWarmth("user-test-fixture", now, db);
     const squatContribution = 12 * decay(60, 20);
     const lungeContribution = 15 * decay(60, 20);
 

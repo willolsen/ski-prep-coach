@@ -16,7 +16,7 @@ const PERMISSIVE_PROFILE: UserProfileForNext = {
 
 test("capabilities combine score/target/priority/limitingRank/isLimiting per capability", async () => {
   await withTransaction(async (db) => {
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(Object.keys(state.capabilities).length, 10);
     const kneeCapacity = state.capabilities.knee_capacity!;
@@ -34,7 +34,7 @@ test("fatigue reports per-bucket values and the aggregate max", async () => {
   await withTransaction(async (db) => {
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: new Date(NOW.getTime() - 3_600_000) });
 
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(state.fatigue.byBucket.length, 1);
     assert.equal(state.fatigue.byBucket[0]!.movementPattern, "squat");
@@ -44,7 +44,7 @@ test("fatigue reports per-bucket values and the aggregate max", async () => {
 
 test("warmth includes the general/pattern numbers and the display label", async () => {
   await withTransaction(async (db) => {
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(state.warmth.general, 0);
     assert.equal(state.warmth.label, "cold");
@@ -54,12 +54,12 @@ test("warmth includes the general/pattern numbers and the display label", async 
 
 test("readiness reflects today's entry, or 'unknown' with no entry submitted", async () => {
   await withTransaction(async (db) => {
-    const withoutEntry = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const withoutEntry = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
     assert.equal(withoutEntry.readiness.computedStatus, "unknown");
     assert.equal(withoutEntry.readiness.entry, null);
 
     await insertReadinessEntry(db, { date: TODAY, painNow: 1, computedStatus: "green" });
-    const withEntry = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const withEntry = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
     assert.equal(withEntry.readiness.computedStatus, "green");
     assert.equal(withEntry.readiness.entry?.painNow, 1);
   });
@@ -69,7 +69,7 @@ test("dailyProgress reports both the raw and priority-weighted stimulus scores",
   await withTransaction(async (db) => {
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: NOW });
 
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     // wall_sit: knee_capacity 7 (priority 10), lower_body_strength 2 (priority 9)
     assert.equal(state.dailyProgress.currentStimulusScore, 9);
@@ -83,7 +83,7 @@ test("safetyVeto reflects the current veto status", async () => {
   await withTransaction(async (db) => {
     await insertReadinessEntry(db, { date: TODAY, painNow: 5, computedStatus: "red" });
 
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(state.safetyVeto.vetoed, true);
     assert.ok(state.safetyVeto.reasonCodes.length > 0);
@@ -92,7 +92,7 @@ test("safetyVeto reflects the current veto status", async () => {
 
 test("candidates cover the whole library with eligibility and score reason codes", async () => {
   await withTransaction(async (db) => {
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(state.candidates.length, 50);
     const coldStartExercise = state.candidates.find((c) => c.exerciseId === "ninety_ninety_hip_switch")!;
@@ -109,7 +109,7 @@ test("candidates cover the whole library with eligibility and score reason codes
 
 test("topCandidate shows the variation/dose analysis for the highest-scored eligible candidate", async () => {
   await withTransaction(async (db) => {
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.ok(state.topCandidate);
     assert.ok(typeof state.topCandidate?.exerciseId === "string");
@@ -131,7 +131,7 @@ test("topCandidate is still computed on a safety-vetoed day, for debugging trans
       });
     }
 
-    const state = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const state = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(state.safetyVeto.vetoed, true);
     assert.ok(state.safetyVeto.reasonCodes.includes("unsafe_fatigue_accumulation"));
@@ -141,11 +141,11 @@ test("topCandidate is still computed on a safety-vetoed day, for debugging trans
 
 test("pendingRecommendation reflects the currently pinned recommendation, or null", async () => {
   await withTransaction(async (db) => {
-    const withoutPending = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const withoutPending = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
     assert.equal(withoutPending.pendingRecommendation, null);
 
-    await setPendingRecommendation("user-001", "11111111-1111-1111-1111-111111111111", { type: "rest" }, NOW, db);
-    const withPending = await getDebugState("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    await setPendingRecommendation("user-test-fixture", "11111111-1111-1111-1111-111111111111", { type: "rest" }, NOW, db);
+    const withPending = await getDebugState("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
     assert.equal(withPending.pendingRecommendation?.recommendationId, "11111111-1111-1111-1111-111111111111");
   });
 });

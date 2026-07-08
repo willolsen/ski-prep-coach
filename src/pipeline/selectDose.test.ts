@@ -6,7 +6,7 @@ import { insertExerciseResultEvent } from "../testing/fixtures.js";
 
 test("with no prior history, flags that a default prescription is needed rather than guessing one", async () => {
   await withTransaction(async (db) => {
-    const dose = await selectDose("user-001", "wall_sit", db);
+    const dose = await selectDose("user-test-fixture", "wall_sit", db);
 
     assert.equal(dose.doseReason, "no_prior_history_needs_default_prescription");
     assert.equal(dose.next, undefined);
@@ -22,7 +22,7 @@ test("reduces duration when pain exceeded the prescribed limit", async () => {
       actual: { maxPain: 5, rpe: 6, difficulty: "hard" },
     });
 
-    const dose = await selectDose("user-001", "wall_sit", db);
+    const dose = await selectDose("user-test-fixture", "wall_sit", db);
 
     assert.equal(dose.doseReason, "reduce_dose_pain_or_difficulty");
     assert.equal(dose.next?.durationSec, 17);
@@ -38,7 +38,7 @@ test("reduces duration when difficulty was too_hard even without exceeding painL
       actual: { maxPain: 2, rpe: 8, difficulty: "too_hard" },
     });
 
-    const dose = await selectDose("user-001", "wall_sit", db);
+    const dose = await selectDose("user-test-fixture", "wall_sit", db);
 
     assert.equal(dose.doseReason, "reduce_dose_pain_or_difficulty");
     assert.equal(dose.next?.durationSec, 17);
@@ -54,7 +54,7 @@ test("increases duration slightly when too_easy with a comfortable rpe margin", 
       actual: { maxPain: 0, rpe: 3, difficulty: "too_easy" },
     });
 
-    const dose = await selectDose("user-001", "wall_sit", db);
+    const dose = await selectDose("user-test-fixture", "wall_sit", db);
 
     assert.equal(dose.doseReason, "increase_dose_slightly");
     assert.equal(dose.next?.durationSec, 23);
@@ -70,7 +70,7 @@ test("maintains dose when neither pain/difficulty nor an easy margin apply", asy
       actual: { maxPain: 1, rpe: 5, difficulty: "normal" },
     });
 
-    const dose = await selectDose("user-001", "wall_sit", db);
+    const dose = await selectDose("user-test-fixture", "wall_sit", db);
 
     assert.equal(dose.doseReason, "maintain_dose");
     assert.equal(dose.next?.durationSec, 20);
@@ -86,7 +86,7 @@ test("adjusts reps instead of duration for a rep-based prescription", async () =
       actual: { maxPain: 5, rpe: 7, difficulty: "hard" },
     });
 
-    const dose = await selectDose("user-001", "bodyweight_squat", db);
+    const dose = await selectDose("user-test-fixture", "bodyweight_squat", db);
 
     assert.equal(dose.doseReason, "reduce_dose_pain_or_difficulty");
     assert.equal(dose.next?.reps, 17);

@@ -17,7 +17,7 @@ test("returns a rest recommendation with a fresh recommendationId when safety-ve
   await withTransaction(async (db) => {
     await insertReadinessEntry(db, { date: TODAY, painNow: 5, computedStatus: "red" });
 
-    const result = await getNextAction("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const result = await getNextAction("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(result.nextAction.type, "rest");
     assert.ok(typeof result.nextAction.recommendationId === "string" && result.nextAction.recommendationId.length > 0);
@@ -41,7 +41,7 @@ test("returns rest when every movement pattern is restricted to avoid, since no 
       likes: [],
     };
 
-    const result = await getNextAction("user-001", "UTC", NOW, profile, db);
+    const result = await getNextAction("user-test-fixture", "UTC", NOW, profile, db);
 
     assert.equal(result.nextAction.type, "rest");
   });
@@ -49,7 +49,7 @@ test("returns rest when every movement pattern is restricted to avoid, since no 
 
 test("returns an exercise recommendation with the expected shape when nothing blocks it", async () => {
   await withTransaction(async (db) => {
-    const result = await getNextAction("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const result = await getNextAction("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(result.nextAction.type, "exercise");
     assert.ok(typeof result.nextAction.exerciseId === "string");
@@ -62,7 +62,7 @@ test("returns an exercise recommendation with the expected shape when nothing bl
 
 test("todayProgress and stateSummary are present alongside the recommendation", async () => {
   await withTransaction(async (db) => {
-    const result = await getNextAction("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const result = await getNextAction("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(result.todayProgress.targetStimulusScore, 70);
     assert.equal(result.todayProgress.stimulusScore, 0);
@@ -75,8 +75,8 @@ test("todayProgress and stateSummary are present alongside the recommendation", 
 
 test("pins the same recommendation on a second call before it's resolved", async () => {
   await withTransaction(async (db) => {
-    const first = await getNextAction("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
-    const second = await getNextAction("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const first = await getNextAction("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const second = await getNextAction("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
 
     assert.equal(first.nextAction.recommendationId, second.nextAction.recommendationId);
     assert.deepEqual(first.nextAction, second.nextAction);
@@ -85,9 +85,9 @@ test("pins the same recommendation on a second call before it's resolved", async
 
 test("recomputes a fresh recommendation after the 4-hour pin expires", async () => {
   await withTransaction(async (db) => {
-    const first = await getNextAction("user-001", "UTC", NOW, PERMISSIVE_PROFILE, db);
+    const first = await getNextAction("user-test-fixture", "UTC", NOW, PERMISSIVE_PROFILE, db);
     const later = new Date(NOW.getTime() + 4.1 * 3_600_000);
-    const second = await getNextAction("user-001", "UTC", later, PERMISSIVE_PROFILE, db);
+    const second = await getNextAction("user-test-fixture", "UTC", later, PERMISSIVE_PROFILE, db);
 
     assert.notEqual(first.nextAction.recommendationId, second.nextAction.recommendationId);
   });

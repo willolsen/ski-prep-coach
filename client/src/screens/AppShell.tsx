@@ -64,15 +64,26 @@ export function AppShell({ userId }: { userId: string }) {
   // the already-loaded GET /next response), so this stays consistent with that.
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryError(null);
+    try {
+      const { history } = await getHistory(userId);
+      setHistory(history);
+      setHistoryLoaded(true);
+    } catch (err) {
+      // Previously silent -- a failed fetch left the Overall tab showing an
+      // empty list with no indication anything went wrong.
+      setHistoryError(err instanceof Error ? err.message : String(err));
+    }
+  }, [userId]);
 
   useEffect(() => {
-    if (activeTab === "overall" && !historyLoaded) {
-      getHistory(userId).then(({ history }) => {
-        setHistory(history);
-        setHistoryLoaded(true);
-      });
+    if (activeTab === "overall" && !historyLoaded && !historyError) {
+      loadHistory();
     }
-  }, [activeTab, historyLoaded, userId]);
+  }, [activeTab, historyLoaded, historyError, loadHistory]);
 
   async function handleSubmit(actual: ActualResult) {
     if (!response) return;
@@ -252,7 +263,16 @@ export function AppShell({ userId }: { userId: string }) {
       </div>
 
       <div className="tab-panel" hidden={activeTab !== "overall"}>
-        <HistoryList entries={history} />
+        {historyError ? (
+          <div className="status-message status-message--error">
+            <p>{historyError}</p>
+            <button className="button" onClick={loadHistory}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          <HistoryList entries={history} />
+        )}
       </div>
     </div>
   );

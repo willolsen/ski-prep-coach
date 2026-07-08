@@ -19,5 +19,38 @@
       "dislikes": [],
       "preferredSessionStyle": "next_action"
     }
+  },
+  {
+    "userId": "user-test-fixture",
+    "displayName": "Test Fixture User",
+    "availableEquipment": ["gym"],
+    "movementPatternRestrictions": {},
+    "preferences": {
+      "likes": [],
+      "dislikes": [],
+      "preferredSessionStyle": "next_action"
+    }
+  },
+  {
+    "userId": "user-http-test",
+    "displayName": "HTTP Test User",
+    "availableEquipment": ["gym"],
+    "movementPatternRestrictions": {},
+    "preferences": {
+      "likes": [],
+      "dislikes": [],
+      "preferredSessionStyle": "next_action"
+    }
+  },
+  {
+    "userId": "user-e2e-test",
+    "displayName": "E2E Test User",
+    "availableEquipment": ["gym"],
+    "movementPatternRestrictions": {},
+    "preferences": {
+      "likes": [],
+      "dislikes": [],
+      "preferredSessionStyle": "next_action"
+    }
   }
 ]

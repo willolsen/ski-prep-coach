@@ -6,7 +6,7 @@ import { withTransaction } from "../testing/withTransaction.js";
 test("stores one exercise_result event per entry with no recommendationId or prescribed block", async () => {
   await withTransaction(async (db) => {
     const eventIds = await logEntries(
-      "user-001",
+      "user-test-fixture",
       [
         {
           exerciseId: "bodyweight_squat",
@@ -35,7 +35,7 @@ test("stores one exercise_result event per entry with no recommendationId or pre
       prescribed: unknown;
       dose_ratio: number;
       clean_completion: boolean;
-    }>(`SELECT source, type, recommendation_id, prescribed, dose_ratio, clean_completion FROM events WHERE user_id = 'user-001' ORDER BY completed_at`);
+    }>(`SELECT source, type, recommendation_id, prescribed, dose_ratio, clean_completion FROM events WHERE user_id = 'user-test-fixture' ORDER BY completed_at`);
 
     assert.equal(rows.length, 2);
     assert.equal(rows[0]!.source, "onboarding");
@@ -52,7 +52,7 @@ test("stores one exercise_result event per entry with no recommendationId or pre
 
 test("an empty entries list stores nothing and returns an empty array", async () => {
   await withTransaction(async (db) => {
-    const eventIds = await logEntries("user-001", [], db);
+    const eventIds = await logEntries("user-test-fixture", [], db);
     assert.deepEqual(eventIds, []);
   });
 });

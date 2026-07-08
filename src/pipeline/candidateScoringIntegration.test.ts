@@ -7,7 +7,7 @@ import { insertExerciseResultEvent } from "../testing/fixtures.js";
 test("scoreCandidates returns results sorted by score descending", async () => {
   await withTransaction(async (db) => {
     const results = await scoreCandidates(
-      "user-001",
+      "user-test-fixture",
       new Date(),
       [],
       new Set(),
@@ -26,9 +26,9 @@ test("a recently-performed exercise scores lower than the same exercise with no 
   await withTransaction(async (db) => {
     const now = new Date();
 
-    const before = await scoreCandidates("user-001", now, [], new Set(), ["wall_sit"], db);
+    const before = await scoreCandidates("user-test-fixture", now, [], new Set(), ["wall_sit"], db);
     await insertExerciseResultEvent(db, { exerciseId: "wall_sit", completedAt: new Date(now.getTime() - 3_600_000) });
-    const after = await scoreCandidates("user-001", now, [], new Set(), ["wall_sit"], db);
+    const after = await scoreCandidates("user-test-fixture", now, [], new Set(), ["wall_sit"], db);
 
     // Recent history adds both a repetition penalty and bucket fatigue, both negative terms.
     assert.ok(after[0]!.score < before[0]!.score);
@@ -39,8 +39,8 @@ test("liked activities score higher than the same candidate without the enjoymen
   await withTransaction(async (db) => {
     const now = new Date();
 
-    const withoutLikes = await scoreCandidates("user-001", now, [], new Set(), ["zone2_trail_hiking"], db);
-    const withLikes = await scoreCandidates("user-001", now, ["hiking"], new Set(), ["zone2_trail_hiking"], db);
+    const withoutLikes = await scoreCandidates("user-test-fixture", now, [], new Set(), ["zone2_trail_hiking"], db);
+    const withLikes = await scoreCandidates("user-test-fixture", now, ["hiking"], new Set(), ["zone2_trail_hiking"], db);
 
     assert.equal(withLikes[0]!.score - withoutLikes[0]!.score, 10);
   });
